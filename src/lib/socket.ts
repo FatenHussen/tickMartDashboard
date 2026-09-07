@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 
 import { JWT_STORAGE_KEY } from 'src/pages/auth/context/jwt/constant';
 
-const SOCKET_URL = 'https://tikmool-ws.octopus-software.online';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL ?? '';
 
 // ----------------------------------------------------------------------
 
