@@ -4,7 +4,7 @@ import type {
   BrandCreateUpdatePayload,
 } from '../types/brand.types';
 
-import { apiRoutes, axiosInstance } from '@/api';
+import { apiRoutes, axiosInstance, postMultipart, patchMultipart } from '@/api';
 
 /** Name is required. Empty optional fields are omitted so the API stores null. */
 function buildBrandFormData(data: BrandCreateUpdatePayload): FormData {
@@ -91,21 +91,12 @@ export const _BrandApi = {
   },
   createBrand: async (data: BrandCreateUpdatePayload): Promise<any> => {
     const formData = buildBrandFormData(data);
-    const response = await axiosInstance.post(apiRoutes.brand.create, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    const response = await postMultipart(apiRoutes.brand.create, formData);
     return response.data;
   },
   updateBrand: async (id: number | string, data: BrandCreateUpdatePayload): Promise<any> => {
     const formData = buildBrandFormData(data);
-
-    const response = await axiosInstance.patch(apiRoutes.brand.update(id), formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    const response = await patchMultipart(apiRoutes.brand.update(id), formData);
     return response.data;
   },
   deleteBrand: async (id: number | string): Promise<any> => {

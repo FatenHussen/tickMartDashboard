@@ -5,7 +5,7 @@ import type {
   ScheduledBasketCreateUpdatePayload,
 } from '../types/scheduled-basket.types';
 
-import { apiRoutes, axiosInstance } from '@/api';
+import { apiRoutes, axiosInstance, postMultipart, patchMultipart } from '@/api';
 
 function buildScheduledBasketFormData(data: ScheduledBasketCreateUpdatePayload): FormData {
   const formData = new FormData();
@@ -84,17 +84,13 @@ export const _ScheduledBasketApi = {
 
   createScheduledBasket: async (data: ScheduledBasketCreateUpdatePayload): Promise<any> => {
     const formData = buildScheduledBasketFormData(data);
-    const response = await axiosInstance.post(apiRoutes.scheduledBasket.create, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await postMultipart(apiRoutes.scheduledBasket.create, formData);
     return response.data;
   },
 
   updateScheduledBasket: async (id: number | string, data: ScheduledBasketCreateUpdatePayload): Promise<any> => {
     const formData = buildScheduledBasketFormData(data);
-    const response = await axiosInstance.patch(apiRoutes.scheduledBasket.update(id), formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await patchMultipart(apiRoutes.scheduledBasket.update(id), formData);
     return response.data;
   },
 

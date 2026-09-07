@@ -4,7 +4,7 @@ import type {
   BasketCreateUpdatePayload,
 } from '../types/basket.types';
 
-import { apiRoutes, axiosInstance } from '@/api';
+import { apiRoutes, axiosInstance, postMultipart, patchMultipart } from '@/api';
 
 export const _BasketApi = {
   getListBaskets: async (
@@ -57,9 +57,7 @@ export const _BasketApi = {
       });
     }
 
-    const response = await axiosInstance.post(apiRoutes.basket.create, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await postMultipart(apiRoutes.basket.create, formData);
     return response.data;
   },
 
@@ -99,9 +97,7 @@ export const _BasketApi = {
       });
     }
 
-    const response = await axiosInstance.patch(apiRoutes.basket.update(id), formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await patchMultipart(apiRoutes.basket.update(id), formData);
     return response.data;
   },
 

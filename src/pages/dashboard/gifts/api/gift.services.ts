@@ -1,6 +1,6 @@
 import type { GiftListResponse, GiftDetailsResponse, BulkGiftCreatePayload, GiftCreateUpdatePayload } from '../types/gift.types';
 
-import { apiRoutes, axiosInstance } from '@/api';
+import { apiRoutes, axiosInstance, postMultipart, putMultipart } from '@/api';
 
 const appendTranslations = (
   formData: FormData,
@@ -47,9 +47,7 @@ export const _GiftApi = {
     if (data.shop_product_variant_id != null)
       formData.append('shop_product_variant_id', String(data.shop_product_variant_id));
 
-    const response = await axiosInstance.post(apiRoutes.gift.create, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await postMultipart(apiRoutes.gift.create, formData);
     return response.data;
   },
 
@@ -66,9 +64,7 @@ export const _GiftApi = {
     if (data.shop_product_variant_id != null)
       formData.append('shop_product_variant_id', String(data.shop_product_variant_id));
 
-    const response = await axiosInstance.put(apiRoutes.gift.update(id), formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await putMultipart(apiRoutes.gift.update(id), formData);
     return response.data;
   },
 

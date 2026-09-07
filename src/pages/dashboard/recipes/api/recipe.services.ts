@@ -5,7 +5,7 @@ import type {
   RecipeCreateUpdatePayload,
 } from '../types/recipe.types';
 
-import { apiRoutes, axiosInstance } from '@/api';
+import { apiRoutes, axiosInstance, postMultipart, patchMultipart } from '@/api';
 import { toApiBilingualDescription } from '@/utils/optional-bilingual-api-placeholder';
 
 function localizedEnAr(field: LocalizedField): { en: string; ar: string } {
@@ -101,16 +101,12 @@ export const _RecipeApi = {
   },
 
   createRecipe: async (data: RecipeCreateUpdatePayload): Promise<any> => {
-    const response = await axiosInstance.post(apiRoutes.recipe.create, buildFormData(data), {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await postMultipart(apiRoutes.recipe.create, buildFormData(data));
     return response.data;
   },
 
   updateRecipe: async (id: number | string, data: RecipeCreateUpdatePayload): Promise<any> => {
-    const response = await axiosInstance.patch(apiRoutes.recipe.update(id), buildFormData(data), {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await patchMultipart(apiRoutes.recipe.update(id), buildFormData(data));
     return response.data;
   },
 
