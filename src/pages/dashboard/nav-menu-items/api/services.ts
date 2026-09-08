@@ -1,6 +1,7 @@
 import type {
   NavMenuItem,
   NavMenuItemPagination,
+  NavMenuRouteKeyOption,
   NavMenuItemListResponse,
   NavMenuItemReorderResponse,
   NavMenuItemDetailsResponse,
@@ -103,4 +104,40 @@ export const _NavMenuItemApi = {
     );
     return response.data;
   },
+
+  /** Built-in screens for the `type=route` picker (`schedules`, `baskets`, …). */
+  getRouteKeys: async (): Promise<NavMenuRouteKeyOption[]> => {
+    const response = await axiosInstance.get(apiRoutes.navMenuItem.routeKeys, {
+      skipErrorToast: true,
+    });
+    return normalizeRouteKeysResponse(response.data);
+  },
 };
+
+function normalizeRouteKeysResponse(raw: unknown): NavMenuRouteKeyOption[] {
+  if (Array.isArray(raw)) return normalizeRouteKeyItems(raw);
+  if (raw && typeof raw === 'object') {
+    const inner = (raw as { data?: unknown }).data;
+    if (Array.isArray(inner)) return normalizeRouteKeyItems(inner);
+    if (inner && typeof inner === 'object' && Array.isArray((inner as { data?: unknown }).data)) {
+      return normalizeRouteKeyItems((inner as { data: unknown[] }).data);
+    }
+  }
+  return [];
+}
+
+function normalizeRouteKeyItems(items: unknown[]): NavMenuRouteKeyOption[] {
+  const seen = new Set<string>();
+  const out: NavMenuRouteKeyOption[] = [];
+
+  for (const item of items) {
+    if (!item || typeof item !== 'object') continue;
+    const row = item as { key?: unknown; label?: NavMenuRouteKeyOption['label'] };
+    const key = String(row.key ?? '').trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ key, label: row.label ?? null });
+  }
+
+  return out;
+}

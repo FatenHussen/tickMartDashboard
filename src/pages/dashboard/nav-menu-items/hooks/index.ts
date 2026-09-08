@@ -76,3 +76,11 @@ export const useReorderNavMenuItems = () => {
     },
   });
 };
+
+export const useFetchNavMenuRouteKeys = (enabled = true) =>
+  useQuery({
+    queryKey: queryKeys.navMenuItem.routeKeys(),
+    queryFn: () => _NavMenuItemApi.getRouteKeys(),
+    enabled,
+    staleTime: 5 * 60 * 1000,
+  });

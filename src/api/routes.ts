@@ -223,6 +223,8 @@ export const apiRoutes = {
     delete: (id: number | string) => `${ROOTS.ADMIN}/nav-menu-items/${id}`,
     /** Persist drag-and-drop ordering. Body: `{ ordered_ids: number[] }`. */
     reorder: `${ROOTS.ADMIN}/nav-menu-items/reorder`,
+    /** Built-in storefront screens for `type=route` (`baskets`, `schedules`, …). */
+    routeKeys: `${ROOTS.ADMIN}/nav-menu-items/route-keys`,
   },
   // Other API routes (from old endpoints)
   chat: '/api/chat',

@@ -30,7 +30,7 @@ import { RHFTextField } from 'src/shared/components/hook-form/rhf-text-field';
 import { CreateFormLayout } from 'src/shared/components/forms/create-form-layout';
 
 import { NAV_MENU_TARGET_FIELD } from '../types';
-import { navMenuTypeOptions, navMenuRouteKeyOptions } from '../utils/nav-menu-labels';
+import { navMenuTypeOptions, navMenuRouteKeyLabel, navMenuRouteKeySelectOptions } from '../utils/nav-menu-labels';
 import {
   NavMenuItemCreateSchema,
   NavMenuItemUpdateSchema,
@@ -41,6 +41,7 @@ import {
   useUpdateNavMenuItem,
   useFetchNavMenuItems,
   useFetchNavMenuItemById,
+  useFetchNavMenuRouteKeys,
 } from '../hooks';
 
 // ----------------------------------------------------------------------
@@ -136,6 +137,7 @@ export default function CreatePage() {
   const { handleSubmit, reset, control, watch } = methods;
   const type = watch('type') as NavMenuItemType;
   const iconFile = watch('icon');
+  const selectedRouteKey = watch('route_key');
   const selectedCategoryId = watch('category_id');
   const selectedBrandId = watch('brand_id');
   const selectedPageId = watch('page_id');
@@ -162,17 +164,27 @@ export default function CreatePage() {
     enabled: type === 'page',
   });
 
-  const routeKeyOptions = useMemo(() => navMenuRouteKeyOptions(t), [t]);
-  const typeOptions = useMemo(() => navMenuTypeOptions(t), [t]);
-
   /** Keeps the saved target selectable even when it falls outside the fetched page. */
   const withSelectedFallback = (
     options: Array<{ value: string; label: string }>,
-    selected: string
+    selected: string,
+    fallbackLabel?: string
   ) => {
     if (!selected || options.some((o) => o.value === selected)) return options;
-    return [{ value: selected, label: `#${selected}` }, ...options];
+    return [{ value: selected, label: fallbackLabel || `#${selected}` }, ...options];
   };
+
+  const { data: routeKeysFromApi } = useFetchNavMenuRouteKeys(type === 'route');
+  const routeKeyOptions = useMemo(
+    () =>
+      withSelectedFallback(
+        navMenuRouteKeySelectOptions(t, routeKeysFromApi),
+        selectedRouteKey ?? '',
+        navMenuRouteKeyLabel(selectedRouteKey, t)
+      ),
+    [t, routeKeysFromApi, selectedRouteKey]
+  );
+  const typeOptions = useMemo(() => navMenuTypeOptions(t), [t]);
 
   const categoryOptions = useMemo(
     () =>

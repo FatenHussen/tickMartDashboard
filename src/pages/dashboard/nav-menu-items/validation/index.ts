@@ -82,7 +82,10 @@ function refineTarget(
     case 'route':
       if (!values.route_key?.trim()) {
         requireField('route_key', t('navMenuItem.routeKeyRequired'));
-      } else if (!(NAV_MENU_ROUTE_KEYS as readonly string[]).includes(values.route_key.trim())) {
+      } else if (
+        !(NAV_MENU_ROUTE_KEYS as readonly string[]).includes(values.route_key.trim()) &&
+        !/^[a-z][a-z0-9_-]*$/.test(values.route_key.trim())
+      ) {
         requireField('route_key', t('navMenuItem.routeKeyInvalid'));
       }
       break;

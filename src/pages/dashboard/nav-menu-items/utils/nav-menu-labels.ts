@@ -1,5 +1,10 @@
 import type { TFunction } from 'i18next';
-import type { NavMenuItem, NavMenuItemType, NavMenuRouteKey } from '../types';
+import type {
+  NavMenuItem,
+  NavMenuItemType,
+  NavMenuRouteKey,
+  NavMenuRouteKeyOption,
+} from '../types';
 
 import { formatTranslated } from '@/utils/format-translated';
 
@@ -24,6 +29,7 @@ const ROUTE_KEY_LABEL_KEY: Record<NavMenuRouteKey, string> = {
   brands: 'form.navMenuRouteBrands',
   shops: 'form.navMenuRouteShops',
   baskets: 'form.navMenuRouteBaskets',
+  schedules: 'form.navMenuRouteSchedules',
   points: 'form.navMenuRoutePoints',
   help: 'form.navMenuRouteHelp',
   subscriptions: 'form.navMenuRouteSubscriptions',
@@ -45,6 +51,40 @@ export function navMenuTypeOptions(t: TableT): Array<{ value: string; label: str
 
 export function navMenuRouteKeyOptions(t: TableT): Array<{ value: string; label: string }> {
   return NAV_MENU_ROUTE_KEYS.map((key) => ({ value: key, label: navMenuRouteKeyLabel(key, t) }));
+}
+
+/**
+ * Dropdown for `type=route`. Prefers labels from `GET /api/admin/nav-menu-items/route-keys`
+ * (so `schedules` and future screens appear without another dashboard release) and keeps the
+ * built-in list as fallback / fill-in when the endpoint is empty or incomplete.
+ */
+export function navMenuRouteKeySelectOptions(
+  t: TableT,
+  fromApi?: NavMenuRouteKeyOption[] | null
+): Array<{ value: string; label: string }> {
+  const fallback = navMenuRouteKeyOptions(t);
+  if (!fromApi?.length) return fallback;
+
+  const seen = new Set<string>();
+  const options: Array<{ value: string; label: string }> = [];
+
+  for (const item of fromApi) {
+    const key = item.key?.trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    options.push({
+      value: key,
+      label: formatTranslated(item.label, '') || navMenuRouteKeyLabel(key, t),
+    });
+  }
+
+  for (const opt of fallback) {
+    if (seen.has(opt.value)) continue;
+    seen.add(opt.value);
+    options.push(opt);
+  }
+
+  return options;
 }
 
 /** First non-empty of a relation's `name` / `title`, whichever the API sent. */

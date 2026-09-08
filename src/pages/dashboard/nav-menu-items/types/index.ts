@@ -14,6 +14,7 @@ export const NAV_MENU_ROUTE_KEYS = [
   'brands',
   'shops',
   'baskets',
+  'schedules',
   'points',
   'help',
   'subscriptions',
@@ -34,6 +35,18 @@ export type NavMenuTargetField = 'route_key' | 'category_id' | 'brand_id' | 'pag
 
 /** Bilingual value; list endpoints may collapse it to the request-language string. */
 export type NavMenuTranslated = string | { ar?: string; en?: string } | null;
+
+/** One row from `GET /api/admin/nav-menu-items/route-keys`. */
+export interface NavMenuRouteKeyOption {
+  key: string;
+  label: NavMenuTranslated;
+}
+
+export interface NavMenuRouteKeysResponse {
+  status?: boolean;
+  message?: string;
+  data: NavMenuRouteKeyOption[];
+}
 
 /** Resolved destination the frontends navigate with (mirrors `GET /api/user/nav-menu`). */
 export interface NavMenuItemTarget {

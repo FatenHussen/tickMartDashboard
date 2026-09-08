@@ -518,6 +518,7 @@ export const queryKeys = {
   navMenuItem: {
     list: (params?: Record<string, unknown>) => ['navMenuItem', 'list', params] as const,
     details: (id: number | string) => ['navMenuItem', 'details', id] as const,
+    routeKeys: () => ['navMenuItem', 'routeKeys'] as const,
   },
   // Popup Campaign query keys
   popupCampaign: {
