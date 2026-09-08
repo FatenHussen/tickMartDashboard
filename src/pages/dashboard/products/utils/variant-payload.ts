@@ -45,9 +45,13 @@ export function toVariantPayload(
 
   if (id != null && id > 0) payload.id = id;
 
-  if (r.sku !== undefined && r.sku !== null) payload.sku = String(r.sku);
+  if (r.sku !== undefined && r.sku !== null && String(r.sku).trim() !== '') {
+    payload.sku = String(r.sku).trim();
+  }
   if (r.model !== undefined && r.model !== null) payload.model = String(r.model);
-  if (r.barcode !== undefined && r.barcode !== null) payload.barcode = String(r.barcode);
+  if (r.barcode !== undefined && r.barcode !== null && String(r.barcode).trim() !== '') {
+    payload.barcode = String(r.barcode).trim();
+  }
 
   const price = toFiniteNumber(r.price);
   const priceSyp = toFiniteNumber(r.price_syp);

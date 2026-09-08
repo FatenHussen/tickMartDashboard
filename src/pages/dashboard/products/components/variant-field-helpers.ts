@@ -21,6 +21,13 @@ export function toOptionalInt(raw: unknown): number | undefined {
   return Math.max(0, Math.floor(n));
 }
 
+/** Discount is an integer 0–100 (percentage and fixed). Empty stays empty. */
+export function toOptionalDiscountInt(raw: unknown): number | undefined {
+  const n = toOptionalInt(raw);
+  if (n == null) return undefined;
+  return Math.min(100, n);
+}
+
 export function toOptionalNumber(raw: unknown): number | undefined {
   if (raw === '' || raw === null || raw === undefined) return undefined;
   const n = Number(raw);
@@ -64,9 +71,8 @@ export function formatLiveAfterDiscountPreview(
     return '';
   }
   const afterUsd = priceAfterDiscount(usd, discountType, discount);
-  const parts: string[] = [`$${afterUsd}`];
   if (sypRate != null && sypRate > 0) {
-    parts.push(`${usdToLocalAmount(afterUsd, sypRate)} SYP`);
+    return `SYP ${usdToLocalAmount(afterUsd, sypRate)} · $${afterUsd}`;
   }
-  return parts.join(' · ');
+  return `$${afterUsd}`;
 }

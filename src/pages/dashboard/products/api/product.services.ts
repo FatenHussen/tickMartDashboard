@@ -91,14 +91,14 @@ const appendVariantRows = (
         formData.append(`variants[${vIndex}][images][${imgIndex}]`, file);
       }
     });
-    if (cleaned.sku !== undefined) {
-      formData.append(`variants[${vIndex}][sku]`, cleaned.sku ?? '');
+    if (cleaned.sku != null && String(cleaned.sku).trim() !== '') {
+      formData.append(`variants[${vIndex}][sku]`, String(cleaned.sku).trim());
     }
     if (cleaned.model !== undefined) {
       formData.append(`variants[${vIndex}][model]`, cleaned.model ?? '');
     }
-    if (cleaned.barcode !== undefined) {
-      formData.append(`variants[${vIndex}][barcode]`, cleaned.barcode ?? '');
+    if (cleaned.barcode != null && String(cleaned.barcode).trim() !== '') {
+      formData.append(`variants[${vIndex}][barcode]`, String(cleaned.barcode).trim());
     }
     if (cleaned.price !== undefined) {
       formData.append(`variants[${vIndex}][price]`, String(cleaned.price));
@@ -225,9 +225,13 @@ const buildProductFormData = (data: ProductCreateUpdatePayload): FormData => {
   formData.append('full_description[ar]', data.full_description?.ar ?? '');
   appendOptionalPositiveInt(formData, 'country_id', data.country_id);
   appendOptionalPositiveInt(formData, 'sale_country_id', data.sale_country_id);
-  formData.append('sku', data.sku ?? '');
+  if (data.sku != null && String(data.sku).trim() !== '') {
+    formData.append('sku', String(data.sku).trim());
+  }
   formData.append('model', data.model ?? '');
-  formData.append('barcode', data.barcode ?? '');
+  if (data.barcode != null && String(data.barcode).trim() !== '') {
+    formData.append('barcode', String(data.barcode).trim());
+  }
   formData.append('time_prepare', data.time_prepare ?? '');
   formData.append('delivery_time', data.delivery_time ?? '');
   const expiryTrimmed = data.expiry_date?.trim() ?? '';

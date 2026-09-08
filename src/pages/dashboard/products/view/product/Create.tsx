@@ -33,6 +33,7 @@ import { TinyMCEEditorField } from '@/shared/components/tinymce-editor/tinymce-e
 import { _SaleCountryApi } from '@/pages/dashboard/sale-countries/api/sale-country.services';
 import { useVariantDeleteFlow } from '@/pages/dashboard/products/hooks/use-variant-delete-flow';
 import { ProductFormExtrasTab } from '@/pages/dashboard/products/components/ProductFormExtrasTab';
+import { ProductPricingFields } from '@/pages/dashboard/products/components/ProductPricingFields';
 import { useFetchCategoryAttributes } from '@/pages/dashboard/categories/hooks/category-attribute';
 import { useFetchProductExtraDetails } from '@/pages/dashboard/categories/hooks/product-extra-detail';
 import { ProductVariantsCardList } from '@/pages/dashboard/products/components/ProductVariantsCardList';
@@ -1253,7 +1254,6 @@ export default function CreatePage() {
     (categoryAttributesAll?.data as { items?: unknown[]; data?: unknown[] } | undefined)?.items ??
     (categoryAttributesAll?.data as { data?: unknown[] } | undefined)?.data ??
     [];
-  const hasCategoryAttributes = !restaurantMode && categoryAttributes.length > 0;
 
   const { data: originCountriesRaw } = useQuery({
     queryKey: ['countries', 'all', 'product-origin'],
@@ -1661,7 +1661,10 @@ export default function CreatePage() {
         price_currency_id: 0,
         /** Synced from `price` in useEffect once USD/SYP rates are ready */
         price_local: undefined,
-        price: p.price == null || Number.isNaN(Number(p.price)) ? undefined : Number(p.price),
+        price:
+          p.price != null && !Number.isNaN(Number(p.price))
+            ? Number(p.price)
+            : currencyMapAmount(p.price_currencies, 'USD'),
         price_syp:
           currencyMapAmount(p.price_currencies, 'SYP') ??
           (p.price != null && !Number.isNaN(Number(p.price)) && sypCurrency
@@ -1669,7 +1672,7 @@ export default function CreatePage() {
             : undefined),
         discount:
           p.discount != null && String(p.discount).trim() !== ''
-            ? Number(p.discount)
+            ? Math.min(100, Math.max(0, Math.floor(Number(p.discount))))
             : undefined,
         discount_type: (p.discount_type as 'none' | 'percentage' | 'fixed') || 'none',
         cost_price: p.cost_price != null ? Number(p.cost_price) : undefined,
@@ -1717,7 +1720,10 @@ export default function CreatePage() {
             sku: (v as any).sku ?? '',
             model: (v as any).model ?? '',
             barcode: (v as any).barcode ?? '',
-            price: (v as any).price != null ? Number((v as any).price) : undefined,
+            price:
+              (v as any).price != null && !Number.isNaN(Number((v as any).price))
+                ? Number((v as any).price)
+                : currencyMapAmount((v as any).price_currencies, 'USD'),
             price_syp:
               currencyMapAmount((v as any).price_currencies, 'SYP') ??
               ((v as any).price != null &&
@@ -1726,7 +1732,10 @@ export default function CreatePage() {
                 ? usdToLocalAmount(Number((v as any).price), parseCurrencyRate(sypCurrency))
                 : undefined),
             quantity: (v as any).quantity != null ? Number((v as any).quantity) : undefined,
-            discount: (v as any).discount != null ? Number((v as any).discount) : undefined,
+            discount:
+              (v as any).discount != null
+                ? Math.min(100, Math.max(0, Math.floor(Number((v as any).discount))))
+                : undefined,
             discount_type:
               ((v as any).discount_type as 'none' | 'percentage' | 'fixed' | undefined) ?? 'none',
             max_purchase_quantity: (v as any).max_purchase_quantity != null ? Number((v as any).max_purchase_quantity) : undefined,
@@ -2423,19 +2432,31 @@ export default function CreatePage() {
       const images = rawImages?.length
         ? await Promise.all(rawImages.map((f) => (f instanceof File ? compressImage(f) : f)))
         : undefined;
-      const saveSkuVal = getValues(`variants.${variantIndex}.sku`) ?? '';
+      const saveSkuVal = String(getValues(`variants.${variantIndex}.sku`) ?? '').trim();
       const modelVal = restaurantMode ? '' : getValues(`variants.${variantIndex}.model`) ?? '';
-      const barcodeVal = restaurantMode ? '' : getValues(`variants.${variantIndex}.barcode`) ?? '';
+      const barcodeVal = restaurantMode
+        ? ''
+        : String(getValues(`variants.${variantIndex}.barcode`) ?? '').trim();
       const savePriceRaw = getValues(`variants.${variantIndex}.price`);
-      const savePriceVal =
+      const savePriceDirect =
         savePriceRaw == null || savePriceRaw === ('' as any) ? undefined : Number(savePriceRaw);
       const savePriceSypRaw = getValues(`variants.${variantIndex}.price_syp`);
       const savePriceSypVal =
-        savePriceVal != null
+        savePriceSypRaw == null || savePriceSypRaw === ('' as any)
           ? undefined
-          : savePriceSypRaw == null || savePriceSypRaw === ('' as any)
-            ? undefined
-            : Number(savePriceSypRaw);
+          : Number(savePriceSypRaw);
+      // PUT /product-variants/{id} does not accept price_syp — convert SYP → USD in the UI.
+      const savePriceVal =
+        savePriceDirect != null && !Number.isNaN(savePriceDirect)
+          ? savePriceDirect
+          : savePriceSypVal != null &&
+              !Number.isNaN(savePriceSypVal) &&
+              sypRate != null &&
+              sypRate > 0
+            ? localAmountToUsd(savePriceSypVal, sypRate)
+            : undefined;
+      const savePriceSypForProductPut =
+        savePriceVal != null ? undefined : savePriceSypVal;
       const quantityVal = toOptionalInt(getValues(`variants.${variantIndex}.quantity`));
       const vDiscType =
         (getValues(`variants.${variantIndex}.discount_type`) as
@@ -2458,13 +2479,12 @@ export default function CreatePage() {
               attributes_values_ids: attrIds,
               existing_images_ids: getValues(`variants.${variantIndex}.existing_images_ids`) || [],
               images,
-              sku: saveSkuVal,
+              ...(saveSkuVal ? { sku: saveSkuVal } : {}),
               model: modelVal,
-              barcode: barcodeVal,
+              ...(barcodeVal ? { barcode: barcodeVal } : {}),
               is_trend: isTrendChecked ? 1 : 0,
               is_active: isActiveChecked ? 1 : 0,
               price: savePriceVal,
-              price_syp: savePriceSypVal,
               ...(quantityVal != null ? { quantity: quantityVal } : {}),
               discount_type: vDiscType,
               discount: vDiscType === 'none' ? 0 : vDiscVal,
@@ -2488,7 +2508,7 @@ export default function CreatePage() {
           model: modelVal,
           barcode: barcodeVal,
           price: savePriceVal,
-          price_syp: savePriceSypVal,
+          price_syp: savePriceSypForProductPut,
           quantity: quantityVal,
           discount_type: vDiscType,
           discount: vDiscType === 'none' ? 0 : vDiscVal,
@@ -2513,6 +2533,7 @@ export default function CreatePage() {
       id,
       createSingleVariantOnProduct,
       setValue,
+      sypRate,
       t,
     ]
   );
@@ -2839,9 +2860,9 @@ export default function CreatePage() {
             </Box>
           </Box>
 
-          {/* Product number, SKU, Model, Barcode — optional */}
+          {/* Product number, Model — SKU / barcode live in ProductPricingFields */}
           {!restaurantMode && (
-            <Box className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Box className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Box className="group">
                 <Box className="flex items-center gap-2 mb-2">
                   <Iconify icon="solar:hashtag-bold" className="text-primary" width={20} />
@@ -2861,39 +2882,6 @@ export default function CreatePage() {
                         placeholder={t('form.productNumberPlaceholder')}
                         className={fieldInputClass(!!error)}
                       />
-                      <FieldErrorText message={error?.message} />
-                    </div>
-                  )}
-                />
-              </Box>
-              <Box className="group">
-                <Box className="flex items-center gap-2 mb-2">
-                  <Iconify icon="solar:tag-bold" className="text-primary" width={20} />
-                  <Typography variant="subtitle2" className="font-semibold text-foreground">
-                    {t('form.productSku')}
-                  </Typography>
-                </Box>
-                <Controller
-                  name="sku"
-                  control={control}
-                  render={({ field, fieldState: { error } }) => (
-                    <div>
-                      <div className="flex gap-2">
-                        <input
-                          {...field}
-                          type="text"
-                          placeholder={t('form.skuPlaceholder')}
-                          className={fieldInputClass(!!error)}
-                        />
-                        <button
-                          type="button"
-                          title={t('form.generateSku')}
-                          onClick={() => field.onChange(generateRandomSku())}
-                          className="flex items-center justify-center rounded-md border border-border bg-muted px-2 hover:bg-muted/80 transition-colors"
-                        >
-                          <Iconify icon="solar:shuffle-bold" width={18} />
-                        </button>
-                      </div>
                       <FieldErrorText message={error?.message} />
                     </div>
                   )}
@@ -2923,32 +2911,31 @@ export default function CreatePage() {
                   )}
                 />
               </Box>
-
-              <Box className="group">
-                <Box className="flex items-center gap-2 mb-2">
-                  <Iconify icon="solar:qr-code-bold" className="text-primary" width={20} />
-                  <Typography variant="subtitle2" className="font-semibold text-foreground">
-                    {t('form.productBarcode')}
-                  </Typography>
-                </Box>
-                <Controller
-                  name="barcode"
-                  control={control}
-                  render={({ field, fieldState: { error } }) => (
-                    <div>
-                      <input
-                        {...field}
-                        type="text"
-                        placeholder={t('form.barcodePlaceholder')}
-                        className={fieldInputClass(!!error)}
-                      />
-                      <FieldErrorText message={error?.message} />
-                    </div>
-                  )}
-                />
-              </Box>
             </Box>
           )}
+
+          <Box className="rounded-lg border border-border/50 bg-muted/10 p-4">
+            <ProductPricingFields
+              prefix=""
+              control={control}
+              watch={watch}
+              setValue={setValue}
+              usdLabel={t('form.productInfoPriceUsd')}
+              sypLabel={t('form.productInfoPriceSyp')}
+              skuLabel={t('form.productSku')}
+              productDualPriceReady={productDualPriceReady}
+              sypCurrency={sypCurrency}
+              sypRate={sypRate}
+              hideSku={restaurantMode}
+              hideBarcode={restaurantMode}
+              showCost
+              skuAction="generate"
+              onSkuAction={() =>
+                setValue('sku', generateRandomSku(), { shouldDirty: true })
+              }
+              t={t}
+            />
+          </Box>
 
           {/* Brand (hidden for restaurant categories) */}
           {!restaurantMode && (

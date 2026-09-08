@@ -14,12 +14,12 @@ import { Iconify } from '@/shared/components/iconify';
 
 import { Box, Button, Typography } from 'src/shared/ui';
 
+import { ProductPricingFields } from './ProductPricingFields';
 import { ProductShopVariantsSection } from '../view/product/ProductShopVariantsSection';
 import {
-  regenerateVariantSku,
-  type ColorsHexLookup,
-  type CategoryAttributeValueRef,
-} from '../utils/variant-combinations';
+  toTwoDecimalNumber,
+  optionalNumberInputDisplay,
+} from './variant-field-helpers';
 import {
   VariantFieldLabel,
   VariantStatusBadge,
@@ -27,19 +27,12 @@ import {
   variantFieldInputClass,
 } from './variant-field-ui';
 import {
-  toOptionalInt,
-  localAmountToUsd,
-  toOptionalNumber,
-  usdToLocalAmount,
-  parseCurrencyRate,
-  toTwoDecimalNumber,
-  optionalNumberInputDisplay,
-  formatLiveAfterDiscountPreview,
-} from './variant-field-helpers';
+  regenerateVariantSku,
+  type ColorsHexLookup,
+  type CategoryAttributeValueRef,
+} from '../utils/variant-combinations';
 
 // ----------------------------------------------------------------------
-
-const inputCls = variantFieldInputClass();
 
 function fieldInputClass(error?: boolean) {
   return variantFieldInputClass(error);
@@ -145,7 +138,7 @@ export function ProductVariantInlineRow({
   valueRefs,
   colorsHexLookup,
   productDualPriceReady,
-  usdCurrency,
+  usdCurrency: _usdCurrency,
   sypCurrency,
   sypRate,
   watchedProductSku,
@@ -231,291 +224,29 @@ export function ProductVariantInlineRow({
         <>
       <Box className="space-y-4 p-5">
         <Box className="space-y-3">
-          {/* Pricing & discount */}
-          <Box
-            className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${
-              productDualPriceReady ? 'xl:grid-cols-5' : 'xl:grid-cols-4'
-            }`}
-          >
-            {productDualPriceReady ? (
-              <>
-                <Box className="min-w-0">
-                  <VariantFieldLabel>
-                    {t('form.variantPriceUsdLabel')}
-                  </VariantFieldLabel>
-                  <Controller
-                    name={`variants.${variantIndex}.price`}
-                    control={control}
-                    render={({ field: f, fieldState: { error } }) => (
-                      <div>
-                        <input
-                          type="number"
-                          placeholder="—"
-                          name={f.name}
-                          ref={f.ref}
-                          onBlur={f.onBlur}
-                          value={optionalNumberInputDisplay(f.value)}
-                          onChange={(e) => {
-                            const next = toTwoDecimalNumber(e.target.value);
-                            f.onChange(next);
-                            if (sypCurrency) {
-                              setValue(
-                                `variants.${variantIndex}.price_syp`,
-                                next == null
-                                  ? (undefined as unknown as number)
-                                  : usdToLocalAmount(next, parseCurrencyRate(sypCurrency)),
-                                { shouldDirty: true }
-                              );
-                            }
-                          }}
-                          className={fieldInputClass(!!error)}
-                          step="any"
-                          min={0}
-                        />
-                        <FieldErrorText message={error?.message} />
-                      </div>
-                    )}
-                  />
-                </Box>
-                <Box className="min-w-0">
-                  <VariantFieldLabel>
-                    {t('form.variantPriceSypLabel')}
-                  </VariantFieldLabel>
-                  <Controller
-                    name={`variants.${variantIndex}.price_syp`}
-                    control={control}
-                    render={({ field: f, fieldState: { error } }) => (
-                      <div>
-                        <input
-                          type="number"
-                          placeholder="—"
-                          step="any"
-                          min={0}
-                          name={f.name}
-                          ref={f.ref}
-                          onBlur={f.onBlur}
-                          value={optionalNumberInputDisplay(f.value)}
-                          onChange={(e) => {
-                            const next = toTwoDecimalNumber(e.target.value);
-                            f.onChange(next);
-                            if (sypCurrency) {
-                              setValue(
-                                `variants.${variantIndex}.price`,
-                                next == null
-                                  ? (undefined as unknown as number)
-                                  : localAmountToUsd(next, parseCurrencyRate(sypCurrency)),
-                                { shouldValidate: true, shouldDirty: true }
-                              );
-                            }
-                          }}
-                          className={fieldInputClass(!!error)}
-                        />
-                        <FieldErrorText message={error?.message} />
-                      </div>
-                    )}
-                  />
-                </Box>
-              </>
-            ) : (
-              <Box className="min-w-0">
-                <VariantFieldLabel>
-                  {t('form.variantPriceLabel')}
-                </VariantFieldLabel>
-                <Controller
-                  name={`variants.${variantIndex}.price`}
-                  control={control}
-                  render={({ field: f, fieldState: { error } }) => (
-                    <div>
-                      <input
-                        type="number"
-                        placeholder="—"
-                        name={f.name}
-                        ref={f.ref}
-                        onBlur={f.onBlur}
-                        value={optionalNumberInputDisplay(f.value)}
-                        onChange={(e) => f.onChange(toTwoDecimalNumber(e.target.value))}
-                        className={fieldInputClass(!!error)}
-                        step="0.01"
-                        min={0}
-                      />
-                      <FieldErrorText message={error?.message} />
-                    </div>
-                  )}
-                />
-              </Box>
-            )}
-
-            <Box className="min-w-0">
-              <VariantFieldLabel>
-                {t('form.productDiscountType')}
-              </VariantFieldLabel>
-              <Controller
-                name={`variants.${variantIndex}.discount_type`}
-                control={control}
-                render={({ field: f }) => (
-                  <select
-                    className={inputCls}
-                    value={f.value ?? 'none'}
-                    onChange={(e) => f.onChange(e.target.value)}
-                    onBlur={f.onBlur}
-                    name={f.name}
-                    ref={f.ref}
-                  >
-                    <option value="none">{t('form.discountTypeNone')}</option>
-                    <option value="percentage">{t('form.discountTypePercentage')}</option>
-                    <option value="fixed">{t('form.discountTypeFixed')}</option>
-                  </select>
-                )}
-              />
-            </Box>
-
-            <Box className="min-w-0">
-              <VariantFieldLabel>
-                {t('form.productDiscountValue')}
-              </VariantFieldLabel>
-              <Controller
-                name={`variants.${variantIndex}.discount`}
-                control={control}
-                render={({ field: f, fieldState: { error } }) => (
-                  <div>
-                    <input
-                      type="number"
-                      min={0}
-                      step="any"
-                      placeholder="—"
-                      disabled={(watch(`variants.${variantIndex}.discount_type`) ?? 'none') === 'none'}
-                      name={f.name}
-                      ref={f.ref}
-                      onBlur={f.onBlur}
-                      value={optionalNumberInputDisplay(f.value)}
-                      onChange={(e) => f.onChange(toTwoDecimalNumber(e.target.value))}
-                      className={fieldInputClass(!!error)}
-                    />
-                    <FieldErrorText message={error?.message} />
-                  </div>
-                )}
-              />
-            </Box>
-
-            <Box className="min-w-0">
-              <VariantFieldLabel>{t('form.variantPriceAfterDiscount')}</VariantFieldLabel>
-              <input
-                type="text"
-                readOnly
-                placeholder="—"
-                className={`${inputCls} bg-muted/25 text-muted-foreground cursor-default`}
-                value={(() => {
-                  const p = toOptionalNumber(watch(`variants.${variantIndex}.price`));
-                  const dt = watch(`variants.${variantIndex}.discount_type`) ?? 'none';
-                  const d = toOptionalNumber(watch(`variants.${variantIndex}.discount`));
-                  if (p == null) return '';
-                  return formatLiveAfterDiscountPreview(p, dt, d, sypRate);
-                })()}
-              />
-            </Box>
-          </Box>
-
-          {/* Quantity · barcode · SKU — one row */}
-          <Box
-            className={`grid grid-cols-1 gap-3 ${
-              restaurantMode ? 'sm:grid-cols-2' : 'sm:grid-cols-3'
-            }`}
-          >
-            <Box className="min-w-0">
-              <VariantFieldLabel>{t('form.variantQuantityLabel')}</VariantFieldLabel>
-              <Controller
-                name={`variants.${variantIndex}.quantity`}
-                control={control}
-                render={({ field: f, fieldState: { error } }) => (
-                  <div>
-                    <input
-                      type="number"
-                      placeholder="—"
-                      name={f.name}
-                      ref={f.ref}
-                      onBlur={f.onBlur}
-                      value={optionalNumberInputDisplay(f.value)}
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        if (raw === '') {
-                          f.onChange(undefined as unknown as number);
-                          return;
-                        }
-                        f.onChange(toOptionalInt(raw));
-                      }}
-                      className={fieldInputClass(!!error)}
-                      step={1}
-                      min={0}
-                    />
-                    <FieldErrorText message={error?.message} />
-                  </div>
-                )}
-              />
-            </Box>
-
-            {!restaurantMode ? (
-              <Box className="min-w-0">
-                <VariantFieldLabel>{t('form.variantBarcode')}</VariantFieldLabel>
-                <Controller
-                  name={`variants.${variantIndex}.barcode`}
-                  control={control}
-                  render={({ field, fieldState: { error } }) => (
-                    <div>
-                      <input
-                        {...field}
-                        value={field.value ?? ''}
-                        type="text"
-                        placeholder={t('form.variantBarcodePlaceholder')}
-                        className={fieldInputClass(!!error)}
-                      />
-                      <FieldErrorText message={error?.message} />
-                    </div>
-                  )}
-                />
-              </Box>
-            ) : null}
-
-            <Box className="min-w-0">
-              <VariantFieldLabel>{t('form.variantSku')}</VariantFieldLabel>
-              <Controller
-                name={`variants.${variantIndex}.sku`}
-                control={control}
-                render={({ field, fieldState: { error } }) => (
-                  <div>
-                    <Box className="flex gap-2">
-                      <input
-                        {...field}
-                        value={field.value ?? ''}
-                        type="text"
-                        placeholder={t('form.variantSkuPlaceholder')}
-                        className={`${fieldInputClass(!!error)} min-w-0 flex-1`}
-                      />
-                      <button
-                        type="button"
-                        className="inline-flex h-9 shrink-0 items-center gap-1 rounded-lg border border-border bg-background px-2.5 text-xs font-medium text-foreground hover:bg-muted"
-                        title={t('form.regenerateSku')}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          field.onChange(
-                            regenerateVariantSku(
-                              watchedProductSku,
-                              valueRefs,
-                              colorsHexLookup
-                            )
-                          );
-                        }}
-                      >
-                        <Iconify icon="solar:refresh-bold" width={15} />
-                        {t('form.generateSkuShort')}
-                      </button>
-                    </Box>
-                    <FieldErrorText message={error?.message} />
-                  </div>
-                )}
-              />
-            </Box>
-          </Box>
+          <ProductPricingFields
+            prefix={`variants.${variantIndex}`}
+            control={control}
+            watch={watch}
+            setValue={setValue}
+            usdLabel={t('form.variantPriceUsdLabel')}
+            sypLabel={t('form.variantPriceSypLabel')}
+            skuLabel={t('form.variantSku')}
+            productDualPriceReady={productDualPriceReady}
+            sypCurrency={sypCurrency}
+            sypRate={sypRate}
+            hideBarcode={restaurantMode}
+            englishSkuOnly
+            skuAction="regenerate"
+            onSkuAction={() =>
+              setValue(
+                `variants.${variantIndex}.sku`,
+                regenerateVariantSku(watchedProductSku, valueRefs, colorsHexLookup),
+                { shouldDirty: true }
+              )
+            }
+            t={t}
+          />
 
           {isShopSaleChannel && shopSvIndex >= 0 ? (
             <Box className="max-w-xs">

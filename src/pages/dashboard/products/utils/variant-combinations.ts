@@ -145,6 +145,17 @@ function sanitizeSkuBase(productSku: string | null | undefined): string {
   return cleaned || 'VAR';
 }
 
+/** Variant SKU: English letters, digits, and hyphen only — strip Arabic and other scripts. */
+export function sanitizeEnglishSkuInput(raw: string): string {
+  return String(raw ?? '').replace(/[^a-zA-Z0-9-]/g, '');
+}
+
+/** Spec §6: `{productSku}-{6 random A–Z/2–9}` — no Arabic. */
+export function generateRandomVariantSku(productSku?: string | null): string {
+  const base = sanitizeSkuBase(productSku);
+  return `${base}-${randomVariantSkuSuffix(6)}`;
+}
+
 function attributeValueSkuPart(
   value: CategoryAttributeValueRef,
   lookup?: ColorsHexLookup | null

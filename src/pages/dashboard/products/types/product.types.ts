@@ -238,8 +238,8 @@ export interface ProductCreateUpdatePayload {
   /** Cost in SYP — converted server-side when `cost_price` is omitted. */
   cost_price_syp?: number;
   /**
-   * Product-level stock for simple products (no category attributes).
-   * Optional — omit when empty. Variant stock is `variants[].quantity`.
+   * Product-level stock — optional on every product (with or without variants).
+   * Omit when empty. Variant stock is `variants[].quantity`.
    */
   quantity?: number;
   /** Optional unique product code (رقم المنتج). */

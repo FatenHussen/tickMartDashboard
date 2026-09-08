@@ -15,15 +15,22 @@ function optionalNonNegNumber(message?: string) {
   }, (message ? zod.number().min(0, { message }) : zod.number().min(0)).optional());
 }
 
-function optionalNonNegInt(message?: string) {
+function optionalNonNegInt() {
   return zod.preprocess((v) => {
     if (v === '' || v === null || v === undefined) return undefined;
     const n = typeof v === 'number' ? v : Number(v);
-    return Number.isFinite(n) ? Math.floor(n) : undefined;
-  }, (message
-    ? zod.number().int({ message }).min(0, { message })
-    : zod.number().int().min(0)
-  ).optional());
+    return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : undefined;
+  }, zod.number().int().min(0).optional());
+}
+
+/** Discount is optional integer 0–100 (percentage and fixed). Empty is omitted — never required. */
+function optionalDiscountInt() {
+  return zod.preprocess((v) => {
+    if (v === '' || v === null || v === undefined) return undefined;
+    const n = typeof v === 'number' ? v : Number(v);
+    if (!Number.isFinite(n)) return undefined;
+    return Math.min(100, Math.max(0, Math.floor(n)));
+  }, zod.number().int().min(0).max(100).optional());
 }
 
 // ----------------------------------------------------------------------
@@ -62,15 +69,15 @@ export const ProductSchema = zod
     price: optionalNonNegNumber(t('product.pricePositive')),
     /** UI + API: SYP sale amount when USD `price` is empty. */
     price_syp: optionalNonNegNumber(),
-    discount: optionalNonNegNumber(),
+    discount: optionalDiscountInt(),
     discount_type: zod.enum(['none', 'percentage', 'fixed']).default('none'),
     cost_price: optionalNonNegNumber(),
     cost_price_syp: optionalNonNegNumber(),
     /**
-     * Product-level stock — optional. Hidden when the category has attributes
-     * (quantity lives on `variants[]`). Never required; omit when empty.
+     * Product-level stock — optional on every product (with or without variants).
+     * Never required; omit when empty. Do not toast “quantity must be positive”.
      */
-    quantity: optionalNonNegInt(t('product.quantityPositive')),
+    quantity: optionalNonNegInt(),
     /** From `/admin/units`; `0` = not selected. */
     unit_id: zod.coerce.number().min(0).optional().default(0),
     warranty_id: zod.coerce.number().min(0).optional().default(0),
@@ -143,8 +150,8 @@ export const ProductSchema = zod
           barcode: zod.string().optional(),
           price: optionalNonNegNumber(t('product.pricePositive')),
           price_syp: optionalNonNegNumber(),
-          quantity: optionalNonNegInt(t('product.quantityPositive')),
-          discount: optionalNonNegNumber(),
+          quantity: optionalNonNegInt(),
+          discount: optionalDiscountInt(),
           discount_type: zod.enum(['none', 'percentage', 'fixed']).optional().default('none'),
           max_purchase_quantity: optionalNonNegNumber(),
           is_trend: zod.coerce.number().min(0).max(1).optional().default(0),
@@ -266,6 +273,13 @@ export const ProductSchema = zod
     }
     // media / images are optional — products can be created without gallery photos
     issueIfPercentageDiscountOver100(ctx, data.discount_type, data.discount, ['discount']);
+    (data.variants ?? []).forEach((row, i) => {
+      issueIfPercentageDiscountOver100(ctx, row.discount_type, row.discount, [
+        'variants',
+        i,
+        'discount',
+      ]);
+    });
   });
 
 export type ProductFormValues = zod.infer<typeof ProductSchema>;

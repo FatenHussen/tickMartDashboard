@@ -58,9 +58,13 @@ const buildVariantFormData = (data: ProductVariantUpdatePayload): FormData => {
 
   if (data.is_trend !== undefined) formData.append('is_trend', String(data.is_trend));
   if (data.is_active !== undefined) formData.append('is_active', String(data.is_active));
-  if (data.sku !== undefined) formData.append('sku', data.sku == null ? '' : data.sku);
+  if (data.sku != null && String(data.sku).trim() !== '') {
+    formData.append('sku', data.sku);
+  }
   if (data.model !== undefined) formData.append('model', data.model == null ? '' : data.model);
-  if (data.barcode !== undefined) formData.append('barcode', data.barcode == null ? '' : data.barcode);
+  if (data.barcode != null && String(data.barcode).trim() !== '') {
+    formData.append('barcode', data.barcode);
+  }
   if (data.price !== undefined) {
     formData.append('price', String(data.price));
   } else if (data.price_syp !== undefined) {
