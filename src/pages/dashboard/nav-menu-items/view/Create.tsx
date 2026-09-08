@@ -30,7 +30,11 @@ import { RHFTextField } from 'src/shared/components/hook-form/rhf-text-field';
 import { CreateFormLayout } from 'src/shared/components/forms/create-form-layout';
 
 import { NAV_MENU_TARGET_FIELD } from '../types';
-import { navMenuTypeOptions, navMenuRouteKeyLabel, navMenuRouteKeySelectOptions } from '../utils/nav-menu-labels';
+import {
+  navMenuTypeOptions,
+  navMenuRouteKeyLabel,
+  navMenuRouteKeySelectOptions,
+} from '../utils/nav-menu-labels';
 import {
   NavMenuItemCreateSchema,
   NavMenuItemUpdateSchema,
@@ -562,7 +566,10 @@ export default function CreatePage() {
               <Controller
                 name="icon"
                 control={control}
-                render={({ field: { onChange, value: _value, ...field }, fieldState: { error } }) => (
+                render={({
+                  field: { onChange, value: _value, ...field },
+                  fieldState: { error },
+                }) => (
                   <div className="w-full">
                     <Input
                       {...field}
