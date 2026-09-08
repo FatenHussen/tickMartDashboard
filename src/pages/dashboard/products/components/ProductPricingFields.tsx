@@ -87,12 +87,11 @@ function FieldCell({ children }: { children: ReactNode }) {
   return <Box className="min-w-0">{children}</Box>;
 }
 
-const FIELD_GRID =
-  'grid grid-cols-2 gap-x-3 gap-y-2.5 md:grid-cols-4';
+const FIELD_GRID = 'grid grid-cols-2 gap-x-3 gap-y-2.5 md:grid-cols-4';
 
 /**
- * Shared compact grid on the product-info tab and each variant card.
- * Identity (product # · model · SKU) · price/discount · cost/qty/barcode.
+ * Product-info tab uses a compact 4-column grid.
+ * Variant cards keep the original SKU / prices / after-discount / qty+barcode layout.
  */
 export function ProductPricingFields({
   prefix,
@@ -126,6 +125,7 @@ export function ProductPricingFields({
   const discountType = (watch(discountTypePath) as string | undefined) ?? 'none';
   const discountDisabled = discountType === 'none';
   const showCostFields = showCost && prefix === '' && productDualPriceReady;
+  const isProductInfo = prefix === '';
 
   const syncPair = (
     usdPath: FieldPath<ProductFormValues>,
@@ -158,6 +158,296 @@ export function ProductPricingFields({
     return formatLiveAfterDiscountPreview(p, dt, d, sypRate);
   })();
 
+  const priceFields = (
+    <>
+      {productDualPriceReady ? (
+        <>
+          <FieldCell>
+            <VariantFieldLabel>{usdLabel}</VariantFieldLabel>
+            <Controller
+              name={pricePath}
+              control={control}
+              render={({ field: f, fieldState: { error } }) => (
+                <div>
+                  <input
+                    type="number"
+                    placeholder="—"
+                    name={f.name}
+                    ref={f.ref}
+                    onBlur={f.onBlur}
+                    value={optionalNumberInputDisplay(f.value)}
+                    onChange={(e) => {
+                      const next = toTwoDecimalNumber(e.target.value);
+                      f.onChange(next);
+                      syncPair(pricePath, priceSypPath, next, 'usd');
+                    }}
+                    className={fieldInputClass(!!error)}
+                    step="any"
+                    min={0}
+                  />
+                  <FieldErrorText message={error?.message} />
+                </div>
+              )}
+            />
+          </FieldCell>
+          <FieldCell>
+            <VariantFieldLabel>{sypLabel}</VariantFieldLabel>
+            <Controller
+              name={priceSypPath}
+              control={control}
+              render={({ field: f, fieldState: { error } }) => (
+                <div>
+                  <input
+                    type="number"
+                    placeholder="—"
+                    step="any"
+                    min={0}
+                    name={f.name}
+                    ref={f.ref}
+                    onBlur={f.onBlur}
+                    value={optionalNumberInputDisplay(f.value)}
+                    onChange={(e) => {
+                      const next = toTwoDecimalNumber(e.target.value);
+                      f.onChange(next);
+                      syncPair(pricePath, priceSypPath, next, 'syp');
+                    }}
+                    className={fieldInputClass(!!error)}
+                  />
+                  <FieldErrorText message={error?.message} />
+                </div>
+              )}
+            />
+          </FieldCell>
+        </>
+      ) : (
+        <FieldCell>
+          <VariantFieldLabel>{usdLabel}</VariantFieldLabel>
+          <Controller
+            name={pricePath}
+            control={control}
+            render={({ field: f, fieldState: { error } }) => (
+              <div>
+                <input
+                  type="number"
+                  placeholder="—"
+                  name={f.name}
+                  ref={f.ref}
+                  onBlur={f.onBlur}
+                  value={optionalNumberInputDisplay(f.value)}
+                  onChange={(e) => f.onChange(toTwoDecimalNumber(e.target.value))}
+                  className={fieldInputClass(!!error)}
+                  step="0.01"
+                  min={0}
+                />
+                <FieldErrorText message={error?.message} />
+              </div>
+            )}
+          />
+        </FieldCell>
+      )}
+
+      <FieldCell>
+        <VariantFieldLabel>{t('form.productDiscountType')}</VariantFieldLabel>
+        <Controller
+          name={discountTypePath}
+          control={control}
+          render={({ field: f }) => (
+            <select
+              className={variantFieldInputClass()}
+              value={(f.value as string | undefined) ?? 'none'}
+              onChange={(e) => {
+                const next = e.target.value;
+                f.onChange(next);
+                if (next === 'none') {
+                  setValue(discountPath, undefined as unknown as number, { shouldDirty: true });
+                }
+              }}
+              onBlur={f.onBlur}
+              name={f.name}
+              ref={f.ref}
+            >
+              <option value="none">{t('form.discountTypeNone')}</option>
+              <option value="percentage">{t('form.discountTypePercentage')}</option>
+              <option value="fixed">{t('form.discountTypeFixed')}</option>
+            </select>
+          )}
+        />
+      </FieldCell>
+
+      <FieldCell>
+        <VariantFieldLabel>{t('form.productDiscountValue')}</VariantFieldLabel>
+        <Controller
+          name={discountPath}
+          control={control}
+          render={({ field: f, fieldState: { error } }) => (
+            <div>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                placeholder="—"
+                disabled={discountDisabled}
+                name={f.name}
+                ref={f.ref}
+                onBlur={f.onBlur}
+                value={optionalNumberInputDisplay(f.value)}
+                onChange={(e) => f.onChange(toOptionalDiscountInt(e.target.value))}
+                className={fieldInputClass(!!error)}
+              />
+              <FieldErrorText message={error?.message} />
+            </div>
+          )}
+        />
+      </FieldCell>
+    </>
+  );
+
+  if (!isProductInfo) {
+    return (
+      <Box className="space-y-3">
+        {title ? (
+          <Typography variant="subtitle2" className="font-semibold text-foreground">
+            {title}
+          </Typography>
+        ) : null}
+
+        {!hideSku ? (
+          <Box className="min-w-0">
+            <VariantFieldLabel>{skuLabel}</VariantFieldLabel>
+            <Controller
+              name={skuPath}
+              control={control}
+              render={({ field, fieldState: { error } }) => (
+                <div>
+                  <Box className="flex gap-2">
+                    <input
+                      {...field}
+                      value={field.value == null ? '' : String(field.value)}
+                      type="text"
+                      placeholder={t('form.variantSkuPlaceholder')}
+                      className={`${fieldInputClass(!!error)} min-w-0 flex-1`}
+                      onChange={(e) => {
+                        const next = englishSkuOnly
+                          ? sanitizeEnglishSkuInput(e.target.value)
+                          : e.target.value;
+                        field.onChange(next);
+                      }}
+                    />
+                    {skuAction && onSkuAction ? (
+                      <button
+                        type="button"
+                        className="inline-flex h-9 shrink-0 items-center gap-1 rounded-lg border border-border bg-background px-2.5 text-xs font-medium text-foreground hover:bg-muted"
+                        title={
+                          skuAction === 'regenerate'
+                            ? t('form.regenerateSku')
+                            : t('form.generateSku')
+                        }
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onSkuAction();
+                        }}
+                      >
+                        <Iconify
+                          icon={
+                            skuAction === 'regenerate'
+                              ? 'solar:refresh-bold'
+                              : 'solar:shuffle-bold'
+                          }
+                          width={15}
+                        />
+                        {t('form.generateSkuShort')}
+                      </button>
+                    ) : null}
+                  </Box>
+                  <FieldErrorText message={error?.message} />
+                </div>
+              )}
+            />
+          </Box>
+        ) : null}
+
+        <Box
+          className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${
+            productDualPriceReady ? 'xl:grid-cols-4' : 'xl:grid-cols-3'
+          }`}
+        >
+          {priceFields}
+        </Box>
+
+        <Box className="min-w-0">
+          <VariantFieldLabel>{t('form.productPriceAfterDiscountReadonly')}</VariantFieldLabel>
+          <input
+            type="text"
+            readOnly
+            placeholder="—"
+            className={`${variantFieldInputClass()} bg-muted/25 text-muted-foreground cursor-default`}
+            value={afterDiscountValue}
+          />
+        </Box>
+
+        <Box
+          className={`grid grid-cols-1 gap-3 ${hideBarcode ? 'sm:grid-cols-1' : 'sm:grid-cols-2'}`}
+        >
+          <Box className="min-w-0">
+            <VariantFieldLabel>{t('form.variantQuantityLabel')}</VariantFieldLabel>
+            <Controller
+              name={quantityPath}
+              control={control}
+              render={({ field: f, fieldState: { error } }) => (
+                <div>
+                  <input
+                    type="number"
+                    placeholder="—"
+                    name={f.name}
+                    ref={f.ref}
+                    onBlur={f.onBlur}
+                    value={optionalNumberInputDisplay(f.value)}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === '') {
+                        f.onChange(undefined as unknown as number);
+                        return;
+                      }
+                      f.onChange(toOptionalInt(raw));
+                    }}
+                    className={fieldInputClass(!!error)}
+                    step={1}
+                    min={0}
+                  />
+                  <FieldErrorText message={error?.message} />
+                </div>
+              )}
+            />
+          </Box>
+
+          {!hideBarcode ? (
+            <Box className="min-w-0">
+              <VariantFieldLabel>{t('form.variantBarcode')}</VariantFieldLabel>
+              <Controller
+                name={barcodePath}
+                control={control}
+                render={({ field, fieldState: { error } }) => (
+                  <div>
+                    <input
+                      {...field}
+                      value={field.value == null ? '' : String(field.value)}
+                      type="text"
+                      placeholder={t('form.variantBarcodePlaceholder')}
+                      className={fieldInputClass(!!error)}
+                    />
+                    <FieldErrorText message={error?.message} />
+                  </div>
+                )}
+              />
+            </Box>
+          ) : null}
+        </Box>
+      </Box>
+    );
+  }
+
   return (
     <Box className="space-y-2.5">
       {title ? (
@@ -168,7 +458,7 @@ export function ProductPricingFields({
 
       {showIdentityFields || !hideSku || !hideBarcode ? (
         <Box className={FIELD_GRID}>
-          {showIdentityFields && prefix === '' ? (
+          {showIdentityFields ? (
             <>
               <FieldCell>
                 <VariantFieldLabel>{t('form.productDetailsProductNumber')}</VariantFieldLabel>
@@ -293,148 +583,7 @@ export function ProductPricingFields({
         </Box>
       ) : null}
 
-      <Box className={FIELD_GRID}>
-        {productDualPriceReady ? (
-          <>
-            <FieldCell>
-              <VariantFieldLabel>{usdLabel}</VariantFieldLabel>
-              <Controller
-                name={pricePath}
-                control={control}
-                render={({ field: f, fieldState: { error } }) => (
-                  <div>
-                    <input
-                      type="number"
-                      placeholder="—"
-                      name={f.name}
-                      ref={f.ref}
-                      onBlur={f.onBlur}
-                      value={optionalNumberInputDisplay(f.value)}
-                      onChange={(e) => {
-                        const next = toTwoDecimalNumber(e.target.value);
-                        f.onChange(next);
-                        syncPair(pricePath, priceSypPath, next, 'usd');
-                      }}
-                      className={fieldInputClass(!!error)}
-                      step="any"
-                      min={0}
-                    />
-                    <FieldErrorText message={error?.message} />
-                  </div>
-                )}
-              />
-            </FieldCell>
-            <FieldCell>
-              <VariantFieldLabel>{sypLabel}</VariantFieldLabel>
-              <Controller
-                name={priceSypPath}
-                control={control}
-                render={({ field: f, fieldState: { error } }) => (
-                  <div>
-                    <input
-                      type="number"
-                      placeholder="—"
-                      step="any"
-                      min={0}
-                      name={f.name}
-                      ref={f.ref}
-                      onBlur={f.onBlur}
-                      value={optionalNumberInputDisplay(f.value)}
-                      onChange={(e) => {
-                        const next = toTwoDecimalNumber(e.target.value);
-                        f.onChange(next);
-                        syncPair(pricePath, priceSypPath, next, 'syp');
-                      }}
-                      className={fieldInputClass(!!error)}
-                    />
-                    <FieldErrorText message={error?.message} />
-                  </div>
-                )}
-              />
-            </FieldCell>
-          </>
-        ) : (
-          <FieldCell>
-            <VariantFieldLabel>{usdLabel}</VariantFieldLabel>
-            <Controller
-              name={pricePath}
-              control={control}
-              render={({ field: f, fieldState: { error } }) => (
-                <div>
-                  <input
-                    type="number"
-                    placeholder="—"
-                    name={f.name}
-                    ref={f.ref}
-                    onBlur={f.onBlur}
-                    value={optionalNumberInputDisplay(f.value)}
-                    onChange={(e) => f.onChange(toTwoDecimalNumber(e.target.value))}
-                    className={fieldInputClass(!!error)}
-                    step="0.01"
-                    min={0}
-                  />
-                  <FieldErrorText message={error?.message} />
-                </div>
-              )}
-            />
-          </FieldCell>
-        )}
-
-        <FieldCell>
-          <VariantFieldLabel>{t('form.productDiscountType')}</VariantFieldLabel>
-          <Controller
-            name={discountTypePath}
-            control={control}
-            render={({ field: f }) => (
-              <select
-                className={variantFieldInputClass()}
-                value={(f.value as string | undefined) ?? 'none'}
-                onChange={(e) => {
-                  const next = e.target.value;
-                  f.onChange(next);
-                  if (next === 'none') {
-                    setValue(discountPath, undefined as unknown as number, { shouldDirty: true });
-                  }
-                }}
-                onBlur={f.onBlur}
-                name={f.name}
-                ref={f.ref}
-              >
-                <option value="none">{t('form.discountTypeNone')}</option>
-                <option value="percentage">{t('form.discountTypePercentage')}</option>
-                <option value="fixed">{t('form.discountTypeFixed')}</option>
-              </select>
-            )}
-          />
-        </FieldCell>
-
-        <FieldCell>
-          <VariantFieldLabel>{t('form.productDiscountValue')}</VariantFieldLabel>
-          <Controller
-            name={discountPath}
-            control={control}
-            render={({ field: f, fieldState: { error } }) => (
-              <div>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  step={1}
-                  placeholder="—"
-                  disabled={discountDisabled}
-                  name={f.name}
-                  ref={f.ref}
-                  onBlur={f.onBlur}
-                  value={optionalNumberInputDisplay(f.value)}
-                  onChange={(e) => f.onChange(toOptionalDiscountInt(e.target.value))}
-                  className={fieldInputClass(!!error)}
-                />
-                <FieldErrorText message={error?.message} />
-              </div>
-            )}
-          />
-        </FieldCell>
-      </Box>
+      <Box className={FIELD_GRID}>{priceFields}</Box>
 
       <Box className={FIELD_GRID}>
         <FieldCell>
