@@ -2860,82 +2860,27 @@ export default function CreatePage() {
             </Box>
           </Box>
 
-          {/* Product number, Model — SKU / barcode live in ProductPricingFields */}
-          {!restaurantMode && (
-            <Box className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Box className="group">
-                <Box className="flex items-center gap-2 mb-2">
-                  <Iconify icon="solar:hashtag-bold" className="text-primary" width={20} />
-                  <Typography variant="subtitle2" className="font-semibold text-foreground">
-                    {t('form.productDetailsProductNumber')}
-                  </Typography>
-                </Box>
-                <Controller
-                  name="product_number"
-                  control={control}
-                  render={({ field, fieldState: { error } }) => (
-                    <div>
-                      <input
-                        {...field}
-                        value={field.value ?? ''}
-                        type="text"
-                        placeholder={t('form.productNumberPlaceholder')}
-                        className={fieldInputClass(!!error)}
-                      />
-                      <FieldErrorText message={error?.message} />
-                    </div>
-                  )}
-                />
-              </Box>
-
-              <Box className="group">
-                <Box className="flex items-center gap-2 mb-2">
-                  <Iconify icon="solar:widget-bold" className="text-primary" width={20} />
-                  <Typography variant="subtitle2" className="font-semibold text-foreground">
-                    {t('form.productModel')}
-                  </Typography>
-                </Box>
-                <Controller
-                  name="model"
-                  control={control}
-                  render={({ field, fieldState: { error } }) => (
-                    <div>
-                      <input
-                        {...field}
-                        type="text"
-                        placeholder={t('form.modelPlaceholder')}
-                        className={fieldInputClass(!!error)}
-                      />
-                      <FieldErrorText message={error?.message} />
-                    </div>
-                  )}
-                />
-              </Box>
-            </Box>
-          )}
-
-          <Box className="rounded-lg border border-border/50 bg-muted/10 p-4">
-            <ProductPricingFields
-              prefix=""
-              control={control}
-              watch={watch}
-              setValue={setValue}
-              usdLabel={t('form.productInfoPriceUsd')}
-              sypLabel={t('form.productInfoPriceSyp')}
-              skuLabel={t('form.productSku')}
-              productDualPriceReady={productDualPriceReady}
-              sypCurrency={sypCurrency}
-              sypRate={sypRate}
-              hideSku={restaurantMode}
-              hideBarcode={restaurantMode}
-              showCost
-              skuAction="generate"
-              onSkuAction={() =>
-                setValue('sku', generateRandomSku(), { shouldDirty: true })
-              }
-              t={t}
-            />
-          </Box>
+          <ProductPricingFields
+            prefix=""
+            control={control}
+            watch={watch}
+            setValue={setValue}
+            usdLabel={t('form.productInfoPriceUsd')}
+            sypLabel={t('form.productInfoPriceSyp')}
+            skuLabel={t('form.productSku')}
+            productDualPriceReady={productDualPriceReady}
+            sypCurrency={sypCurrency}
+            sypRate={sypRate}
+            hideSku={restaurantMode}
+            hideBarcode={restaurantMode}
+            showCost
+            showIdentityFields={!restaurantMode}
+            skuAction="generate"
+            onSkuAction={() =>
+              setValue('sku', generateRandomSku(), { shouldDirty: true })
+            }
+            t={t}
+          />
 
           {/* Brand (hidden for restaurant categories) */}
           {!restaurantMode && (

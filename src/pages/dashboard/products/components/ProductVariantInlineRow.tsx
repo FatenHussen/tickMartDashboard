@@ -21,16 +21,16 @@ import {
   optionalNumberInputDisplay,
 } from './variant-field-helpers';
 import {
+  regenerateVariantSku,
+  type ColorsHexLookup,
+  type CategoryAttributeValueRef,
+} from '../utils/variant-combinations';
+import {
   VariantFieldLabel,
   VariantStatusBadge,
   VariantAttributeChain,
   variantFieldInputClass,
 } from './variant-field-ui';
-import {
-  regenerateVariantSku,
-  type ColorsHexLookup,
-  type CategoryAttributeValueRef,
-} from '../utils/variant-combinations';
 
 // ----------------------------------------------------------------------
 
