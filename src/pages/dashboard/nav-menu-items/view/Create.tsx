@@ -31,15 +31,15 @@ import { CreateFormLayout } from 'src/shared/components/forms/create-form-layout
 
 import { NAV_MENU_TARGET_FIELD } from '../types';
 import {
-  navMenuTypeOptions,
-  navMenuRouteKeyLabel,
-  navMenuRouteKeySelectOptions,
-} from '../utils/nav-menu-labels';
-import {
   NavMenuItemCreateSchema,
   NavMenuItemUpdateSchema,
   type NavMenuItemFormValues,
 } from '../validation';
+import {
+  navMenuTypeOptions,
+  navMenuRouteKeyLabel,
+  navMenuRouteKeySelectOptions,
+} from '../utils/nav-menu-labels';
 import {
   useCreateNavMenuItem,
   useUpdateNavMenuItem,
