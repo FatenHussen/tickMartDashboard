@@ -1,6 +1,8 @@
 export interface IconItem {
   id: number;
   name: string | { en: string; ar: string };
+  /** Seeded SVG URL (`storage/icons/*.svg`). Same asset as `image`. */
+  icon?: string | null;
   image: string;
   description: string | { en: string; ar: string } | null;
   full_description?: { en: string; ar: string } | null;

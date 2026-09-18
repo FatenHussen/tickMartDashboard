@@ -422,7 +422,8 @@ export const queryKeys = {
   },
   // Icon query keys
   icon: {
-    list: (params?: { page?: number; per_page?: number }) => ['icon', 'list', params] as const,
+    list: (params?: { page?: number; per_page?: number; search?: string; is_active?: number }) =>
+      ['icon', 'list', params] as const,
     details: (id: number | string) => ['icon', 'details', id] as const,
   },
   // Color query keys

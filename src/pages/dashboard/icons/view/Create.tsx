@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Iconify } from '@/shared/components/iconify';
 import { useParams, useNavigate } from 'react-router';
 import { compressImage } from '@/utils/compress-image';
+import { iconArtworkSrc } from '@/pages/dashboard/icons/utils/icon-artwork';
 import { TinyMCEEditorField } from '@/shared/components/tinymce-editor/tinymce-editor';
 import {
   useCreateIcon,
@@ -62,7 +63,7 @@ export default function CreatePage() {
   useEffect(() => {
     if (isEditMode && detailsResponse?.data) {
       const item = detailsResponse.data;
-      setPreviewImage(item.image || null);
+      setPreviewImage(iconArtworkSrc(item) || item.image || null);
       const name = item.name;
       const desc = item.description;
       const fd = item.full_description;
@@ -163,7 +164,7 @@ export default function CreatePage() {
               <Controller name="image" control={control} render={({ field: { onChange, ...field }, fieldState: { error } }) => (
                 <div className="w-full">
                   <Input {...field} value={undefined} type="file" accept="image/jpeg,image/png,image/jpg,image/gif,image/svg+xml,image/webp" onChange={(e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; onChange(file || null); }} error={!!error} helperText={error?.message || (isEditMode ? t('form.imageHelperEdit') : t('form.imageHelper'))} fullWidth />
-                  {previewImage && (<Box className="mt-3"><img src={previewImage} alt={t('form.iconPreviewAlt')} className="w-16 h-16 object-cover rounded-lg border border-border" /></Box>)}
+                  {previewImage && (<Box className="mt-3"><img src={previewImage} alt={t('form.iconPreviewAlt')} className="w-16 h-16 object-contain rounded-lg border border-border p-1 bg-muted/20" /></Box>)}
                 </div>
               )} />
             </Box>

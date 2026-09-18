@@ -16,9 +16,9 @@ import {
   toShopVariantPayloadList,
 } from '../utils/variant-payload';
 import {
+  sanitizeProductsImportFile,
   buildProductsImportTemplateBlob,
   PRODUCT_IMPORT_TEMPLATE_FILENAME,
-  sanitizeProductsImportFile,
 } from '../utils/product-import-template';
 
 // ----------------------------------------------------------------------
@@ -64,6 +64,32 @@ const appendSeoKeywords = (formData: FormData, kw?: { en?: string; ar?: string }
   splitKeywords(kw.ar ?? '').forEach((w) => formData.append('seo_keywords[ar][]', w));
 };
 
+/** Optional FK select: send a positive id only. Never send `""` (MySQL integer error). */
+const appendOptionalPositiveInt = (formData: FormData, key: string, value: unknown) => {
+  if (value == null || value === '') return;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return;
+  formData.append(key, String(n));
+};
+
+/**
+ * Optional string: omit blank values. Empty `""` becomes SQL 500 on TIME/DATETIME
+ * columns and on unique varchar indexes (duplicate empty `model` / `sku`).
+ */
+const appendOptionalTrimmed = (formData: FormData, key: string, value: unknown) => {
+  if (value == null) return;
+  const s = String(value).trim();
+  if (!s) return;
+  formData.append(key, s);
+};
+
+const appendOptionalFiniteNumber = (formData: FormData, key: string, value: unknown) => {
+  if (value == null || value === '') return;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return;
+  formData.append(key, String(n));
+};
+
 const appendVariantRows = (
   formData: FormData,
   rows: ProductCreateUpdatePayload['variants'] | undefined
@@ -75,6 +101,10 @@ const appendVariantRows = (
     if (!cleaned) return;
     if (cleaned.id) {
       formData.append(`variants[${vIndex}][id]`, String(cleaned.id));
+      // Always send kept image ids on update; omitting the key deletes every variant image.
+      (cleaned.existing_images_ids ?? []).forEach((imgId, imgIndex) => {
+        formData.append(`variants[${vIndex}][existing_images_ids][${imgIndex}]`, String(imgId));
+      });
     }
     (cleaned.attributes_values_ids ?? []).forEach((attrValueId, attrIndex) => {
       formData.append(
@@ -82,24 +112,14 @@ const appendVariantRows = (
         String(attrValueId)
       );
     });
-    // Always send kept image ids; omitting the key deletes every variant image.
-    (cleaned.existing_images_ids ?? []).forEach((imgId, imgIndex) => {
-      formData.append(`variants[${vIndex}][existing_images_ids][${imgIndex}]`, String(imgId));
-    });
     (cleaned.images ?? []).forEach((file, imgIndex) => {
       if (file instanceof File) {
         formData.append(`variants[${vIndex}][images][${imgIndex}]`, file);
       }
     });
-    if (cleaned.sku != null && String(cleaned.sku).trim() !== '') {
-      formData.append(`variants[${vIndex}][sku]`, String(cleaned.sku).trim());
-    }
-    if (cleaned.model !== undefined) {
-      formData.append(`variants[${vIndex}][model]`, cleaned.model ?? '');
-    }
-    if (cleaned.barcode != null && String(cleaned.barcode).trim() !== '') {
-      formData.append(`variants[${vIndex}][barcode]`, String(cleaned.barcode).trim());
-    }
+    appendOptionalTrimmed(formData, `variants[${vIndex}][sku]`, cleaned.sku);
+    appendOptionalTrimmed(formData, `variants[${vIndex}][model]`, cleaned.model);
+    appendOptionalTrimmed(formData, `variants[${vIndex}][barcode]`, cleaned.barcode);
     if (cleaned.price !== undefined) {
       formData.append(`variants[${vIndex}][price]`, String(cleaned.price));
     } else if (cleaned.price_syp !== undefined) {
@@ -144,14 +164,6 @@ const appendShopVariantRows = (
   });
 };
 
-/** Optional FK select: send a positive id only. Never send `""` (MySQL integer error). */
-const appendOptionalPositiveInt = (formData: FormData, key: string, value: unknown) => {
-  if (value == null || value === '') return;
-  const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) return;
-  formData.append(key, String(n));
-};
-
 const buildProductFormData = (data: ProductCreateUpdatePayload): FormData => {
   const formData = new FormData();
 
@@ -161,11 +173,11 @@ const buildProductFormData = (data: ProductCreateUpdatePayload): FormData => {
     formData.append('product_id', pid);
   }
 
-  formData.append('category_id', data.category_id.toString());
-  formData.append('name[en]', data.name.en);
-  formData.append('name[ar]', data.name.ar);
-  formData.append('description[en]', data.description.en);
-  formData.append('description[ar]', data.description.ar);
+  formData.append('category_id', String(data.category_id));
+  formData.append('name[en]', data.name?.en ?? '');
+  formData.append('name[ar]', data.name?.ar ?? '');
+  formData.append('description[en]', data.description?.en ?? '');
+  formData.append('description[ar]', data.description?.ar ?? '');
   if (data.price !== undefined && data.price !== null && !Number.isNaN(Number(data.price))) {
     formData.append('price', String(data.price));
   } else if (
@@ -175,10 +187,8 @@ const buildProductFormData = (data: ProductCreateUpdatePayload): FormData => {
   ) {
     formData.append('price_syp', String(data.price_syp));
   }
-  if (data.product_number != null && String(data.product_number).trim() !== '') {
-    formData.append('product_number', String(data.product_number).trim());
-  }
-  formData.append('is_instant_delivery', data.is_instant_delivery.toString());
+  appendOptionalTrimmed(formData, 'product_number', data.product_number);
+  formData.append('is_instant_delivery', Number(data.is_instant_delivery) === 1 ? '1' : '0');
 
   formData.append('is_visible', String(data.is_visible ?? 1));
   appendOptionalPositiveInt(formData, 'brand_id', data.brand_id);
@@ -225,21 +235,13 @@ const buildProductFormData = (data: ProductCreateUpdatePayload): FormData => {
   formData.append('full_description[ar]', data.full_description?.ar ?? '');
   appendOptionalPositiveInt(formData, 'country_id', data.country_id);
   appendOptionalPositiveInt(formData, 'sale_country_id', data.sale_country_id);
-  if (data.sku != null && String(data.sku).trim() !== '') {
-    formData.append('sku', String(data.sku).trim());
-  }
-  formData.append('model', data.model ?? '');
-  if (data.barcode != null && String(data.barcode).trim() !== '') {
-    formData.append('barcode', String(data.barcode).trim());
-  }
-  formData.append('time_prepare', data.time_prepare ?? '');
-  formData.append('delivery_time', data.delivery_time ?? '');
-  const expiryTrimmed = data.expiry_date?.trim() ?? '';
-  if (data.id != null) {
-    formData.append('expiry_date', expiryTrimmed);
-  } else if (expiryTrimmed) {
-    formData.append('expiry_date', expiryTrimmed);
-  }
+  appendOptionalTrimmed(formData, 'sku', data.sku);
+  appendOptionalTrimmed(formData, 'model', data.model);
+  appendOptionalTrimmed(formData, 'barcode', data.barcode);
+  // No prepare-time field in the form — never send `""` (TIME/DATETIME SQL error).
+  appendOptionalTrimmed(formData, 'time_prepare', data.time_prepare);
+  appendOptionalTrimmed(formData, 'delivery_time', data.delivery_time);
+  appendOptionalTrimmed(formData, 'expiry_date', data.expiry_date);
 
   formData.append('seo_title[en]', data.seo_title?.en ?? '');
   formData.append('seo_title[ar]', data.seo_title?.ar ?? '');
@@ -254,15 +256,15 @@ const buildProductFormData = (data: ProductCreateUpdatePayload): FormData => {
     formData.append('thumbnail', data.thumbnail);
   }
 
-  // Send every kept gallery id; omitting the key entirely often makes Laravel drop all media on update.
-  if (Array.isArray(data.existing_media_ids)) {
+  // Send every kept gallery id on update; omitting the key often drops all media.
+  if (data.id != null && Array.isArray(data.existing_media_ids)) {
     data.existing_media_ids.forEach((mediaId) => {
       formData.append('existing_media_ids[]', String(mediaId));
     });
   }
   if (data.images && data.images.length > 0) {
     data.images.forEach((file) => {
-      formData.append('media[]', file);
+      if (file instanceof File) formData.append('media[]', file);
     });
   }
 
@@ -313,7 +315,7 @@ const buildProductFormData = (data: ProductCreateUpdatePayload): FormData => {
         `extra_details[${index}][quantity]`,
         String(detail.quantity ?? 1)
       );
-      formData.append(`extra_details[${index}][price]`, String(detail.price));
+      appendOptionalFiniteNumber(formData, `extra_details[${index}][price]`, detail.price);
     });
   }
 
@@ -321,9 +323,15 @@ const buildProductFormData = (data: ProductCreateUpdatePayload): FormData => {
     formData.append('badges[]', String(badgeId));
   });
 
-  (data.icon_ids ?? []).forEach((iconId) => {
-    formData.append('icon_ids[]', String(iconId));
-  });
+  const iconIds = (data.icon_ids ?? [])
+    .map((iconId) => Number(iconId))
+    .filter((iconId) => Number.isFinite(iconId) && iconId > 0);
+  if (iconIds.length > 0) {
+    iconIds.forEach((iconId) => formData.append('icon_ids[]', String(iconId)));
+  } else if (data.id != null) {
+    // Omit on create. On update, empty must be explicit or PUT keeps old icons.
+    formData.append('icon_ids', '');
+  }
 
   return formData;
 };

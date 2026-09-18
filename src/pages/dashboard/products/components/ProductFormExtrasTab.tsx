@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Iconify } from '@/shared/components/iconify';
 import { formatTranslated } from '@/utils/format-translated';
+import { iconArtworkSrc } from '@/pages/dashboard/icons/utils/icon-artwork';
 
 import { Box, Typography } from 'src/shared/ui';
 import { RHFBadgeSelector } from 'src/shared/components/hook-form/rhf-badge-selector';
@@ -93,9 +94,13 @@ export function ProductFormExtrasTab({
 
   return (
     <Box className="space-y-5">
+      <Typography variant="body2" className="text-muted-foreground">
+        {t('form.extrasTabIntro')}
+      </Typography>
       <SectionCard
         icon="solar:medal-ribbons-star-bold"
         title={t('form.badgesTitle')}
+        helper={t('form.extrasTabBadgesHelper')}
       >
         <RHFBadgeSelector name="badges" />
       </SectionCard>
@@ -103,6 +108,7 @@ export function ProductFormExtrasTab({
       <SectionCard
         icon="solar:shield-check-bold"
         title={t('form.iconsTitle')}
+        helper={t('form.extrasTabIconsHelper')}
       >
         {isLoadingIcons ? (
           <Box className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
@@ -140,7 +146,7 @@ export function ProductFormExtrasTab({
                       : 'border-border bg-background hover:border-primary/40 hover:bg-muted/30'
                   }`}
                 >
-                  <IconArtwork src={ic.icon || ic.image} />
+                  <IconArtwork src={iconArtworkSrc(ic)} />
                   <Box className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium text-foreground">
                       {iconLabel(ic)}

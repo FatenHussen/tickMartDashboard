@@ -184,7 +184,13 @@ export interface ProductDetailData {
     position?: string;
     postion?: string;
   }>;
-  icons?: Array<{ id: number; name?: string; icon?: string }>;
+  icons?: Array<{
+    id: number;
+    name?: string | { en?: string; ar?: string };
+    icon?: string | null;
+    image?: string | null;
+    description?: string | { en?: string; ar?: string } | null;
+  }>;
   rating?: number;
   rating_count?: number;
 }

@@ -48,7 +48,9 @@ export function toVariantPayload(
   if (r.sku !== undefined && r.sku !== null && String(r.sku).trim() !== '') {
     payload.sku = String(r.sku).trim();
   }
-  if (r.model !== undefined && r.model !== null) payload.model = String(r.model);
+  if (r.model !== undefined && r.model !== null && String(r.model).trim() !== '') {
+    payload.model = String(r.model).trim();
+  }
   if (r.barcode !== undefined && r.barcode !== null && String(r.barcode).trim() !== '') {
     payload.barcode = String(r.barcode).trim();
   }

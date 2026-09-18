@@ -3,7 +3,9 @@ import type { ColumnDef } from '@tanstack/react-table';
 import type { IconItem } from '@/pages/dashboard/icons/types/icon.types';
 
 import { z } from 'zod';
+import { formatTranslated } from '@/utils/format-translated';
 import { TableActiveBadge } from '@/shared/components/table-status-badges';
+import { iconArtworkSrc } from '@/pages/dashboard/icons/utils/icon-artwork';
 import { createToggleColumn } from '@/shared/ui/table-data/data-table-toggle-cell';
 import { DataTableRowActions } from '@/shared/ui/table-data/data-table-row-actions';
 import { DataTableColumnHeader } from '@/shared/ui/table-data/data-table-column-header';
@@ -29,23 +31,25 @@ export const iconColumns = (
     id: 'image',
     accessorKey: 'image',
     header: ({ column }) => <DataTableColumnHeader column={column} title={t('columns.image')} />,
-    cell: ({ row }) => (
-      <div className="w-10 h-10 rounded-lg border border-border overflow-hidden bg-muted/30">
-        {row.original.image ? (
-          <img src={row.original.image} alt="icon" className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">—</div>
-        )}
-      </div>
-    ),
+    cell: ({ row }) => {
+      const src = iconArtworkSrc(row.original);
+      return (
+        <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted/30 p-1">
+          {src ? (
+            <img src={src} alt="" className="h-full w-full object-contain" />
+          ) : (
+            <div className="text-muted-foreground text-xs">—</div>
+          )}
+        </div>
+      );
+    },
   },
   {
     id: 'name',
     accessorKey: 'name',
     header: ({ column }) => <DataTableColumnHeader column={column} title={t('columns.name')} />,
     cell: ({ row }) => {
-      const name = row.original.name;
-      const display = typeof name === 'string' ? name : name?.en || name?.ar || '—';
+      const display = formatTranslated(row.original.name, '—');
       return <span className="font-semibold text-foreground">{display}</span>;
     },
   },

@@ -8,7 +8,7 @@ import { _IconApi } from '../api/icon.services';
 export const useFetchIcons = (
   page: number = 1,
   perPage: number = 10,
-  params?: { search?: string }
+  params?: { search?: string; is_active?: number }
 ) =>
   useQuery({
     queryKey: queryKeys.icon.list({ page, per_page: perPage, ...params }),

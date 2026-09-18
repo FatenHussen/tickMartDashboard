@@ -13,6 +13,7 @@ import { compressImages } from '@/utils/compress-image';
 import { useRef, useMemo, useState, useEffect } from 'react';
 import { formatTranslated } from '@/utils/format-translated';
 import { getApiErrorMessage } from '@/lib/get-api-error-message';
+import { iconArtworkSrc } from '@/pages/dashboard/icons/utils/icon-artwork';
 import { useFetchProductById } from '@/pages/dashboard/products/hooks/product';
 import { useFetchCurrencies } from '@/pages/dashboard/currencies/hooks/currency';
 import { priceAfterDiscount } from '@/pages/dashboard/products/utils/variant-combinations';
@@ -1129,23 +1130,31 @@ export default function DetailsPage() {
             </ProductDetailsSection>
 
             {/* Icons */}
-            {product.icons?.length > 0 && (
+            {product.icons?.length ? (
               <ProductDetailsSection title={t('form.productDetailsIcons')} icon="solar:star-bold">
                 <Box className="flex flex-wrap gap-3">
-                  {product.icons.map((ic: any) => (
-                    <Box
-                      key={ic.id}
-                      className="flex items-center gap-2.5 rounded-xl border border-border/50 bg-muted/15 px-3 py-2.5"
-                    >
-                      {ic.icon ? (
-                        <img src={ic.icon} alt="" className="h-8 w-8 object-contain" />
-                      ) : null}
-                      <Typography variant="body2" className="font-medium">{ic.name ?? ic.id}</Typography>
-                    </Box>
-                  ))}
+                  {product.icons.map((ic) => {
+                    const src = iconArtworkSrc(ic);
+                    const name = formatTranslated(ic.name, '') || `#${ic.id}`;
+                    const description = formatTranslated(ic.description, '');
+                    return (
+                      <Box
+                        key={ic.id}
+                        title={description || undefined}
+                        className="flex items-center gap-2.5 rounded-xl border border-border/50 bg-muted/15 px-3 py-2.5"
+                      >
+                        {src ? (
+                          <img src={src} alt={name} className="h-8 w-8 object-contain" />
+                        ) : null}
+                        <Typography variant="body2" className="font-medium">
+                          {name}
+                        </Typography>
+                      </Box>
+                    );
+                  })}
                 </Box>
               </ProductDetailsSection>
-            )}
+            ) : null}
 
             {/* Badges (product merchandising) */}
             {product.badges?.length > 0 && (

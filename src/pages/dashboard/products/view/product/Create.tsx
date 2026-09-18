@@ -14,6 +14,7 @@ import { Iconify } from '@/shared/components/iconify';
 import { useQuery, useQueries } from '@tanstack/react-query';
 import { formatTranslated } from '@/utils/format-translated';
 import { getApiErrorMessage } from '@/lib/get-api-error-message';
+import { useFetchIcons } from '@/pages/dashboard/icons/hooks/icon';
 import { useFetchUnits } from '@/pages/dashboard/units/hooks/unit';
 import { useFetchShops } from '@/pages/dashboard/vendor/hooks/shop';
 import { _ShopApi } from '@/pages/dashboard/vendor/api/shop.services';
@@ -851,16 +852,26 @@ export default function CreatePage() {
     }));
   }, [warrantiesListResponse?.data?.items]);
 
-  const { data: iconsListResponse, isLoading: isLoadingIcons } = useQuery({
-    queryKey: ['icons', 'product-form'],
-    queryFn: () =>
-      axiosInstance.get(apiRoutes.icon.list, { params: { per_page: 200 } }).then((r) => r.data),
-  });
-  const iconOptions: any[] = (() => {
-    const raw = iconsListResponse as any;
-    if (!raw) return [];
-    return raw.data?.data ?? raw.data?.items ?? (Array.isArray(raw.data) ? raw.data : []) ?? [];
-  })();
+  const { data: iconsListResponse, isLoading: isLoadingIcons } = useFetchIcons(1, 500);
+  const iconOptions = useMemo(() => {
+    const fromApi = (iconsListResponse?.data?.items ?? []).filter((ic) => ic.is_active !== false);
+    const byId = new Map(fromApi.map((ic) => [Number(ic.id), ic]));
+    for (const ic of productResponse?.icons ?? []) {
+      const iconId = Number(ic.id);
+      if (!iconId || byId.has(iconId)) continue;
+      byId.set(iconId, {
+        id: iconId,
+        name: ic.name ?? `#${iconId}`,
+        icon: ic.icon ?? ic.image ?? null,
+        image: ic.image ?? ic.icon ?? '',
+        description: ic.description ?? null,
+        is_active: true,
+        created_at: '',
+        updated_at: '',
+      });
+    }
+    return Array.from(byId.values());
+  }, [iconsListResponse, productResponse?.icons]);
 
   const createProductMutation = useCreateProduct();
   const updateProductMutation = useUpdateProduct();
