@@ -859,12 +859,13 @@ export default function CreatePage() {
     for (const ic of productResponse?.icons ?? []) {
       const iconId = Number(ic.id);
       if (!iconId || byId.has(iconId)) continue;
+      const fallback = `#${iconId}`;
       byId.set(iconId, {
         id: iconId,
-        name: ic.name ?? `#${iconId}`,
+        name: formatTranslated(ic.name, '') || fallback,
         icon: ic.icon ?? ic.image ?? null,
         image: ic.image ?? ic.icon ?? '',
-        description: ic.description ?? null,
+        description: ic.description ? formatTranslated(ic.description, '') || null : null,
         is_active: true,
         created_at: '',
         updated_at: '',

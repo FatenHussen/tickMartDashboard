@@ -1133,7 +1133,7 @@ export default function DetailsPage() {
             {product.icons?.length ? (
               <ProductDetailsSection title={t('form.productDetailsIcons')} icon="solar:star-bold">
                 <Box className="flex flex-wrap gap-3">
-                  {product.icons.map((ic) => {
+                  {product.icons.map((ic: NonNullable<ProductDetailData['icons']>[number]) => {
                     const src = iconArtworkSrc(ic);
                     const name = formatTranslated(ic.name, '') || `#${ic.id}`;
                     const description = formatTranslated(ic.description, '');
