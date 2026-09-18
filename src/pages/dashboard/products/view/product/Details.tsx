@@ -25,6 +25,10 @@ import {
   useUpdateShopProductVariant,
 } from '@/pages/dashboard/products/hooks/product-variant';
 import {
+  variantImageFieldsFromRow,
+  normalizeVariantExistingImages,
+} from '@/pages/dashboard/products/utils/variant-payload';
+import {
   ProductDetailsTag,
   ProductDetailsChip,
   ProductDetailsField,
@@ -319,20 +323,28 @@ function EditVariantModal({
     }
   }, [open, variant, dualPriceReady, sypRate]);
 
-  const existingImages: { id: number; url: string }[] = variant?.images ?? [];
+  const existingImages = normalizeVariantExistingImages(variant?.images);
   const [keptImageIds, setKeptImageIds] = useState<number[]>([]);
 
   useEffect(() => {
     if (open && variant) {
-      setKeptImageIds((variant.images ?? []).map((img: any) => img.id));
+      setKeptImageIds(normalizeVariantExistingImages(variant.images).map((img) => img.id));
     }
   }, [open, variant]);
 
   const handleSubmit = async () => {
     if (!variant?.id) return;
     const attrIds: number[] = (variant.attributes ?? []).map((a: any) => a.value_id ?? a.id).filter(Boolean);
+    const originalIds = normalizeVariantExistingImages(variant.images).map((img) => img.id);
+    const imageFields = variantImageFieldsFromRow({
+      images: newImages,
+      existing_images_ids: keptImageIds,
+      original_existing_images_ids: originalIds,
+    });
     const images =
-      newImages.length > 0 ? await compressImages(newImages) : undefined;
+      imageFields.images && imageFields.images.length > 0
+        ? await compressImages(imageFields.images)
+        : undefined;
     const priceNum = price !== '' ? Number(price) : undefined;
     const priceSypNum =
       priceNum != null
@@ -348,8 +360,10 @@ function EditVariantModal({
           is_trend: isTrend,
           is_active: isActive,
           attributes_values_ids: attrIds,
-          existing_images_ids: keptImageIds,
-          images,
+          ...(imageFields.existing_images_ids !== undefined
+            ? { existing_images_ids: imageFields.existing_images_ids }
+            : {}),
+          ...(images ? { images } : {}),
           sku,
           ...(isRestaurant ? { model: '', barcode: '' } : { model, barcode }),
           price: priceNum,
@@ -1284,13 +1298,13 @@ export default function DetailsPage() {
                         </Box>
                       )}
 
-                      {variant.images?.length > 0 && (
+                      {normalizeVariantExistingImages(variant.images).length > 0 && (
                         <Box>
                           <Typography variant="caption" className="mb-2 block text-muted-foreground">
                             {t('form.productDetailsVariantImages')}
                           </Typography>
                           <Box className="flex max-w-full gap-2 overflow-x-auto pb-1 [scrollbar-width:thin]">
-                            {variant.images.map((img: { id: number; url: string }) => (
+                            {normalizeVariantExistingImages(variant.images).map((img) => (
                               <a
                                 key={img.id}
                                 href={img.url}

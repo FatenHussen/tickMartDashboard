@@ -67,6 +67,8 @@ import {
   toShopVariantPayload,
   savedProductHasShopLink,
   responseIncludesVariants,
+  variantImageFieldsFromRow,
+  variantExistingImageFormState,
 } from '@/pages/dashboard/products/utils/variant-payload';
 
 import { paths } from 'src/routes/paths';
@@ -146,6 +148,8 @@ function makeBlankVariantRow(): GeneratedVariantRow {
     discount_type: 'none',
     images: [],
     existing_images_ids: [],
+    existing_images: [],
+    original_existing_images_ids: [],
     model: '',
     barcode: '',
     is_trend: 0,
@@ -1723,12 +1727,15 @@ export default function CreatePage() {
         },
         seo_image: undefined,
         variants:
-          p.variants?.map((v) => ({
+          p.variants?.map((v) => {
+            const imageState = variantExistingImageFormState(v.images);
+            return {
             id: v.id,
             attributes_values_ids: [],
             images: [],
-            existing_images_ids:
-              (v.images ?? []).map((img: any) => Number(img.id)).filter((mediaId) => !Number.isNaN(mediaId)) ?? [],
+            existing_images_ids: imageState.existing_images_ids,
+            existing_images: imageState.existing_images,
+            original_existing_images_ids: imageState.original_existing_images_ids,
             sku: (v as any).sku ?? '',
             model: (v as any).model ?? '',
             barcode: (v as any).barcode ?? '',
@@ -1753,7 +1760,8 @@ export default function CreatePage() {
             max_purchase_quantity: (v as any).max_purchase_quantity != null ? Number((v as any).max_purchase_quantity) : undefined,
             is_trend: Number((v as any).is_trend) === 1 ? 1 : 0,
             is_active: (v as any).is_active === false || Number((v as any).is_active) === 0 ? 0 : 1,
-          })) ?? [],
+            };
+          }) ?? [],
         category_details:
           p.category_details?.map((cd) => ({
             id: cd.id,
@@ -1947,15 +1955,23 @@ export default function CreatePage() {
       const matchedAttr = (categoryAttributes as any[]).find((a: any) =>
         (a.values || []).some((val: any) => ids.includes(Number(val.id)))
       );
+      const fromApiImages = variantExistingImageFormState(v.images);
+      const prevIds =
+        prev && Array.isArray(prev.existing_images_ids)
+          ? prev.existing_images_ids
+          : fromApiImages.existing_images_ids;
       return {
         id: v.id,
         category_attribute_id: matchedAttr?.id ?? (prev as any)?.category_attribute_id,
         attributes_values_ids: ids,
         images: prevFiles,
-        existing_images_ids:
-          prev && Array.isArray(prev.existing_images_ids)
-            ? prev.existing_images_ids
-            : (v.images ?? []).map((img: any) => Number(img.id)).filter((mediaId) => !Number.isNaN(mediaId)) ?? [],
+        existing_images_ids: prevIds,
+        existing_images: Array.isArray(prev?.existing_images)
+          ? prev.existing_images.filter((im) => prevIds.includes(Number(im.id)))
+          : fromApiImages.existing_images,
+        original_existing_images_ids: Array.isArray(prev?.original_existing_images_ids)
+          ? prev.original_existing_images_ids
+          : fromApiImages.original_existing_images_ids,
         sku: (prev as any)?.sku ?? (v as any).sku ?? '',
         model: (prev as any)?.model ?? (v as any).model ?? '',
         barcode: (prev as any)?.barcode ?? (v as any).barcode ?? '',
@@ -2053,6 +2069,8 @@ export default function CreatePage() {
                 isEditMode,
                 productResponse
               ),
+              existing_images: dv.existing_images,
+              original_existing_images_ids: dv.original_existing_images_ids,
             };
           }
           const lvFiles = filterFileList(lv.images);
@@ -2069,6 +2087,9 @@ export default function CreatePage() {
               isEditMode,
               productResponse
             ),
+            existing_images: lv.existing_images ?? dv.existing_images,
+            original_existing_images_ids:
+              lv.original_existing_images_ids ?? dv.original_existing_images_ids,
           };
         }),
       };
@@ -2178,6 +2199,7 @@ export default function CreatePage() {
               price_syp?: number | string;
               quantity?: number | string;
               existing_images_ids?: number[];
+              original_existing_images_ids?: number[];
             }
           | undefined;
         const toNum = (v: unknown) =>
@@ -2198,6 +2220,11 @@ export default function CreatePage() {
             existing_images_ids: Array.isArray(row0?.existing_images_ids)
               ? row0!.existing_images_ids
               : [],
+            original_existing_images_ids: Array.isArray(row0?.original_existing_images_ids)
+              ? row0!.original_existing_images_ids
+              : Array.isArray(row0?.existing_images_ids)
+                ? row0!.existing_images_ids
+                : [],
             is_active: 1,
             is_trend: 0,
             discount_type: 'none' as const,
@@ -2427,6 +2454,35 @@ export default function CreatePage() {
   /** Field-array index of the shop-variant row currently being created via PUT /products/{id}. */
   const [shopVariantCreateBusyIdx, setShopVariantCreateBusyIdx] = useState<number | null>(null);
 
+  const applySavedVariantImages = useCallback(
+    async (variantIndex: number, variantId: number) => {
+      if (!id) {
+        setValue(`variants.${variantIndex}.images`, [], { shouldDirty: false });
+        return;
+      }
+      try {
+        const product = await _ProductApi.getProductById(id);
+        const saved = product.variants?.find((x) => Number(x.id) === Number(variantId));
+        const state = variantExistingImageFormState(saved?.images);
+        setValue(`variants.${variantIndex}.existing_images`, state.existing_images, {
+          shouldDirty: false,
+        });
+        setValue(`variants.${variantIndex}.existing_images_ids`, state.existing_images_ids, {
+          shouldDirty: false,
+        });
+        setValue(
+          `variants.${variantIndex}.original_existing_images_ids`,
+          state.original_existing_images_ids,
+          { shouldDirty: false }
+        );
+        setValue(`variants.${variantIndex}.images`, [], { shouldDirty: false });
+      } catch {
+        setValue(`variants.${variantIndex}.images`, [], { shouldDirty: false });
+      }
+    },
+    [id, setValue]
+  );
+
   const saveVariantRow = useCallback(
     async (variantIndex: number) => {
       const variantId = getValues(`variants.${variantIndex}.id`);
@@ -2439,10 +2495,11 @@ export default function CreatePage() {
         return;
       }
 
-      const newImgs = getValues(`variants.${variantIndex}.images`);
-      const rawImages = Array.isArray(newImgs) && newImgs.length > 0 ? newImgs : undefined;
-      const images = rawImages?.length
-        ? await Promise.all(rawImages.map((f) => (f instanceof File ? compressImage(f) : f)))
+      const imageFields = variantImageFieldsFromRow(
+        getValues(`variants.${variantIndex}`) as unknown as Record<string, unknown>
+      );
+      const images = imageFields.images?.length
+        ? await Promise.all(imageFields.images.map((f) => (f instanceof File ? compressImage(f) : f)))
         : undefined;
       const saveSkuVal = String(getValues(`variants.${variantIndex}.sku`) ?? '').trim();
       const modelVal = restaurantMode ? '' : getValues(`variants.${variantIndex}.model`) ?? '';
@@ -2489,8 +2546,10 @@ export default function CreatePage() {
             id: variantId,
             data: {
               attributes_values_ids: attrIds,
-              existing_images_ids: getValues(`variants.${variantIndex}.existing_images_ids`) || [],
-              images,
+              ...(imageFields.existing_images_ids !== undefined
+                ? { existing_images_ids: imageFields.existing_images_ids }
+                : {}),
+              ...(images ? { images } : {}),
               ...(saveSkuVal ? { sku: saveSkuVal } : {}),
               model: modelVal,
               ...(barcodeVal ? { barcode: barcodeVal } : {}),
@@ -2502,6 +2561,7 @@ export default function CreatePage() {
               discount: vDiscType === 'none' ? 0 : vDiscVal,
             },
           });
+          await applySavedVariantImages(variantIndex, Number(variantId));
           toast.success(t('form.variantSaveSuccess'));
         } catch {
           toast.error(t('form.variantSaveFailed'));
@@ -2527,7 +2587,7 @@ export default function CreatePage() {
         });
         if (newId > 0) {
           setValue(`variants.${variantIndex}.id`, newId, { shouldDirty: false });
-          setValue(`variants.${variantIndex}.images`, [], { shouldDirty: false });
+          await applySavedVariantImages(variantIndex, newId);
           toast.success(t('form.variantCreateSuccess'));
         } else {
           toast.error(t('form.variantCreateFailed'));
@@ -2544,6 +2604,7 @@ export default function CreatePage() {
       updateVariantMutation,
       id,
       createSingleVariantOnProduct,
+      applySavedVariantImages,
       setValue,
       sypRate,
       t,

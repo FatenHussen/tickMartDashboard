@@ -145,6 +145,17 @@ export const ProductSchema = zod
             zod.array(zod.instanceof(File)).optional()
           ),
           existing_images_ids: zod.array(zod.coerce.number()).optional(),
+          /** UI-only: saved thumbs from GET `variants[].images[].url`. Not sent as files. */
+          existing_images: zod
+            .array(
+              zod.object({
+                id: zod.coerce.number(),
+                url: zod.string(),
+              })
+            )
+            .optional(),
+          /** UI-only snapshot from last GET/save — omit image keys when unchanged. */
+          original_existing_images_ids: zod.array(zod.coerce.number()).optional(),
           sku: zod.string().optional(),
           model: zod.string().optional(),
           barcode: zod.string().optional(),

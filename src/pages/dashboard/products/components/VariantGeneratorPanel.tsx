@@ -38,6 +38,8 @@ export type GeneratedVariantRow = {
   discount_type: 'none' | 'percentage' | 'fixed';
   images: [];
   existing_images_ids: [];
+  existing_images: [];
+  original_existing_images_ids: [];
   model: string;
   barcode: string;
   is_trend: 0;
@@ -196,6 +198,8 @@ export function VariantGeneratorPanel({
       discount_type: 'none',
       images: [],
       existing_images_ids: [],
+      existing_images: [],
+      original_existing_images_ids: [],
       model: '',
       barcode: '',
       is_trend: 0,

@@ -11,9 +11,9 @@ import { apiRoutes, axiosInstance } from '@/api';
 
 import { _BrandApi } from './brand.services';
 import {
-  toVariantPayload,
   toVariantPayloadList,
   toShopVariantPayloadList,
+  appendExistingImageIdList,
 } from '../utils/variant-payload';
 import {
   sanitizeProductsImportFile,
@@ -96,15 +96,16 @@ const appendVariantRows = (
 ) => {
   const variants = toVariantPayloadList(rows);
   if (variants.length === 0) return;
-  variants.forEach((variant, vIndex) => {
-    const cleaned = toVariantPayload(variant);
-    if (!cleaned) return;
+  variants.forEach((cleaned, vIndex) => {
     if (cleaned.id) {
       formData.append(`variants[${vIndex}][id]`, String(cleaned.id));
-      // Always send kept image ids on update; omitting the key deletes every variant image.
-      (cleaned.existing_images_ids ?? []).forEach((imgId, imgIndex) => {
-        formData.append(`variants[${vIndex}][existing_images_ids][${imgIndex}]`, String(imgId));
-      });
+    }
+    if (cleaned.existing_images_ids !== undefined) {
+      appendExistingImageIdList(
+        formData,
+        `variants[${vIndex}][existing_images_ids]`,
+        cleaned.existing_images_ids
+      );
     }
     (cleaned.attributes_values_ids ?? []).forEach((attrValueId, attrIndex) => {
       formData.append(
@@ -112,9 +113,9 @@ const appendVariantRows = (
         String(attrValueId)
       );
     });
-    (cleaned.images ?? []).forEach((file, imgIndex) => {
+    (cleaned.images ?? []).forEach((file) => {
       if (file instanceof File) {
-        formData.append(`variants[${vIndex}][images][${imgIndex}]`, file);
+        formData.append(`variants[${vIndex}][images][]`, file);
       }
     });
     appendOptionalTrimmed(formData, `variants[${vIndex}][sku]`, cleaned.sku);

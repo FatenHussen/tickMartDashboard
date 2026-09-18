@@ -17,6 +17,7 @@ import { _ColorApi } from '@/pages/dashboard/colors/api/color.services';
 
 import { Box, Button, Typography } from 'src/shared/ui';
 
+import { VariantImagesField } from './VariantImagesField';
 import { ProductShopVariantsSection } from '../view/product/ProductShopVariantsSection';
 import {
   generateVariantSku,
@@ -168,7 +169,7 @@ function VariantTableRow({
   isEditMode,
   isShopSaleChannel,
   productId,
-  productResponse,
+  productResponse: _productResponse,
   shops,
   shopVariantsFields,
   watchedShopVariants,
@@ -515,45 +516,15 @@ function VariantTableRow({
                 ) : null}
               </Box>
 
-              <Box>
-                <Typography variant="caption" className="text-muted-foreground mb-1 block text-[11px]">
-                  {t('form.variantImagesOptional')}
-                </Typography>
-                <Controller
-                  name={`variants.${variantIndex}.images`}
-                  control={control}
-                  render={({ field: { onChange, value, ref, name, onBlur } }) => {
-                    const variantFileInputId = `variant-images-${variantIndex}-${variantFieldId}`;
-                    return (
-                      <div>
-                        <input
-                          id={variantFileInputId}
-                          ref={ref}
-                          name={name}
-                          onBlur={onBlur}
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="sr-only"
-                          tabIndex={-1}
-                          onChange={(e) => {
-                            const picked = e.target.files ? Array.from(e.target.files) : [];
-                            const prev = Array.isArray(value) ? value : [];
-                            onChange([...prev, ...picked]);
-                            e.currentTarget.value = '';
-                          }}
-                        />
-                        <label
-                          htmlFor={variantFileInputId}
-                          className="inline-flex cursor-pointer rounded-lg border border-border bg-background px-2 py-1 text-xs font-medium hover:bg-muted"
-                        >
-                          {t('form.chooseFiles')}
-                        </label>
-                      </div>
-                    );
-                  }}
-                />
-              </Box>
+              <VariantImagesField
+                variantIndex={variantIndex}
+                variantFieldId={variantFieldId}
+                control={control}
+                watch={watch}
+                setValue={setValue}
+                t={t}
+                compact
+              />
 
               {isShopSaleChannel ? (
                 <ProductShopVariantsSection

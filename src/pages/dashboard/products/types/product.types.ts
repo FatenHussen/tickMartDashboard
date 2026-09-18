@@ -157,7 +157,7 @@ export interface ProductDetailData {
       cost_price?: number | null;
       cost_price_currencies?: Record<string, ProductDetailCurrencyAmount> | null;
     }>;
-    images: Array<{ id: number; url: string }>;
+    images: Array<{ id: number; url: string; path?: string }>;
   }>;
   category_details: Array<{
     id: number;

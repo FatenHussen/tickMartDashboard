@@ -1,7 +1,11 @@
 import type { ProductCreateUpdatePayload } from '../types/product.types';
 
+import { resolveStorageImageUrl } from '@/utils/shop-variant-image';
+
 export type VariantPayloadRow = NonNullable<ProductCreateUpdatePayload['variants']>[number];
 export type ShopVariantPayloadRow = NonNullable<ProductCreateUpdatePayload['shop_variants']>[number];
+
+export type VariantExistingImage = { id: number; url: string };
 
 function toFiniteNumber(value: unknown): number | undefined {
   if (value === '' || value === null || value === undefined) return undefined;
@@ -20,6 +24,90 @@ function toIdList(value: unknown): number[] {
   return value.map(Number).filter((n) => Number.isFinite(n) && n > 0);
 }
 
+function sameIdSet(a: number[], b: number[]): boolean {
+  if (a.length !== b.length) return false;
+  const left = [...a].sort((x, y) => x - y);
+  const right = [...b].sort((x, y) => x - y);
+  return left.every((id, i) => id === right[i]);
+}
+
+/** Admin GET uses `url`; user GET uses `path`. Either is a full URL (or storage path). */
+export function normalizeVariantExistingImages(raw: unknown): VariantExistingImage[] {
+  if (!Array.isArray(raw)) return [];
+  const out: VariantExistingImage[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const rec = item as Record<string, unknown>;
+    const id = Number(rec.id);
+    if (!Number.isFinite(id) || id <= 0) continue;
+    const rawUrl = rec.url ?? rec.path;
+    const url = resolveStorageImageUrl(typeof rawUrl === 'string' ? rawUrl : null);
+    if (!url) continue;
+    out.push({ id, url });
+  }
+  return out;
+}
+
+export function variantExistingImageFormState(images: unknown): {
+  existing_images: VariantExistingImage[];
+  existing_images_ids: number[];
+  original_existing_images_ids: number[];
+} {
+  const existing_images = normalizeVariantExistingImages(images);
+  const existing_images_ids = existing_images.map((img) => img.id);
+  return {
+    existing_images,
+    existing_images_ids,
+    original_existing_images_ids: [...existing_images_ids],
+  };
+}
+
+/**
+ * Multipart image keys for a variant row.
+ *
+ * - untouched → omit both keys (backend keeps current media)
+ * - add on top of saved → `existing_images_ids` + new `images`
+ * - replace all → `images` only
+ * - delete all → `existing_images_ids: []`
+ */
+export function variantImageFieldsFromRow(
+  row: Record<string, unknown> | null | undefined,
+  options?: { omitImages?: boolean }
+): Pick<VariantPayloadRow, 'images' | 'existing_images_ids'> {
+  if (!row || options?.omitImages) return {};
+
+  const files = Array.isArray(row.images)
+    ? (row.images as unknown[]).filter((f): f is File => f instanceof File)
+    : [];
+  const currentIds = toIdList(row.existing_images_ids ?? row.existingImageIds);
+  const hasOriginal =
+    Array.isArray(row.original_existing_images_ids) ||
+    Array.isArray(row.originalExistingImageIds);
+  const originalIds = toIdList(row.original_existing_images_ids ?? row.originalExistingImageIds);
+
+  if (files.length > 0) {
+    if (currentIds.length > 0) {
+      return { images: files, existing_images_ids: currentIds };
+    }
+    return { images: files };
+  }
+
+  if (hasOriginal && !sameIdSet(currentIds, originalIds)) {
+    return { existing_images_ids: currentIds };
+  }
+
+  return {};
+}
+
+/** `existing_images_ids[]` — empty array is sent so Laravel sees the key (clear-all). */
+export function appendExistingImageIdList(formData: FormData, key: string, ids: number[]): void {
+  if (ids.length === 0) {
+    formData.append(`${key}[]`, '');
+    return;
+  }
+  ids.forEach((id) => formData.append(`${key}[]`, String(id)));
+}
+
 /**
  * Backend whitelist for `variants[]`. Extra GET fields (`shops`, `price_currencies`,
  * `attributes`, `stock`, …) are ignored by the API and must not be forwarded.
@@ -31,16 +119,11 @@ export function toVariantPayload(
   if (!row || typeof row !== 'object') return null;
   const r = row as Record<string, unknown>;
   const id = toFiniteNumber(r.id);
-  const existingImageIds = toIdList(r.existing_images_ids ?? r.existingImageIds);
-  const images = options?.omitImages
-    ? undefined
-    : Array.isArray(r.images)
-      ? (r.images as unknown[]).filter((f): f is File => f instanceof File)
-      : undefined;
+  const imageFields = variantImageFieldsFromRow(r, options);
 
   const payload: VariantPayloadRow = {
     attributes_values_ids: toIdList(r.attributes_values_ids ?? r.attributeValueIds),
-    existing_images_ids: existingImageIds,
+    ...imageFields,
   };
 
   if (id != null && id > 0) payload.id = id;
@@ -82,8 +165,6 @@ export function toVariantPayload(
   if (isTrend !== undefined) payload.is_trend = isTrend;
   const isActive = toFlag01(r.is_active ?? r.isActive, 1);
   if (isActive !== undefined) payload.is_active = isActive;
-
-  if (images && images.length > 0) payload.images = images;
 
   return payload;
 }

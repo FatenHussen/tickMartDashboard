@@ -9,6 +9,8 @@ import type {
 
 import { apiRoutes, axiosInstance } from '@/api';
 
+import { appendExistingImageIdList } from '../utils/variant-payload';
+
 // ----------------------------------------------------------------------
 
 export interface ProductVariantUpdatePayload {
@@ -89,9 +91,9 @@ const buildVariantFormData = (data: ProductVariantUpdatePayload): FormData => {
     formData.append('attributes_values_ids[]', String(id));
   });
 
-  (data.existing_images_ids ?? []).forEach((id) => {
-    formData.append('existing_images_ids[]', String(id));
-  });
+  if (data.existing_images_ids !== undefined) {
+    appendExistingImageIdList(formData, 'existing_images_ids', data.existing_images_ids);
+  }
 
   if (data.images && data.images.length > 0) {
     data.images.forEach((file) => formData.append('images[]', file));
