@@ -136,8 +136,8 @@ function VariantPriceEditor({
     );
   };
 
-  const fieldShell = 'flex min-w-0 flex-col gap-1';
-  const labelClass = 'text-xs leading-snug text-muted-foreground';
+  const fieldShell = 'flex min-w-[8.5rem] flex-1 flex-col gap-1';
+  const labelClass = 'whitespace-nowrap text-xs leading-snug text-muted-foreground';
 
   if (!canEdit) {
     const usdP = Number(variant.price) || 0;
@@ -169,7 +169,7 @@ function VariantPriceEditor({
 
   return (
     <div className="space-y-3 rounded-md border border-border/60 bg-muted/10 px-3 py-3">
-      <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="flex flex-wrap items-end gap-x-3 gap-y-3">
         {dualPriceReady ? (
           <>
             <div className={fieldShell}>
@@ -486,7 +486,7 @@ export function ProductVariantsPriceModal({
     <Dialog
       open={open}
       onClose={onClose}
-      maxWidth="xl"
+      maxWidth="4xl"
       className="max-h-[90vh] overflow-hidden flex flex-col"
       title={
         <span className="flex items-center gap-2">
@@ -505,7 +505,7 @@ export function ProductVariantsPriceModal({
                 {productDualPriceReady ? (
                   <>
                     <div className="flex min-w-[140px] flex-1 flex-col gap-1">
-                      <span className="text-xs text-muted-foreground">
+                      <span className="whitespace-nowrap text-xs text-muted-foreground">
                         {t('form.productPriceUsdLabel')}
                       </span>
                       <Input
@@ -518,7 +518,7 @@ export function ProductVariantsPriceModal({
                       />
                     </div>
                     <div className="flex min-w-[140px] flex-1 flex-col gap-1">
-                      <span className="text-xs text-muted-foreground">
+                      <span className="whitespace-nowrap text-xs text-muted-foreground">
                         {t('form.productPriceSypLabel')}
                       </span>
                       <Input
