@@ -26,6 +26,8 @@ export type NotificationItemProps = {
     avatarUrl: string | null;
     createdAt: string | number | null;
     url?: string | null;
+    entityType?: string | null;
+    entityId?: string | null;
   };
   onOpen?: (notification: NotificationItemProps['notification']) => void;
   onOpenLink?: (notification: NotificationItemProps['notification']) => void;
@@ -52,7 +54,7 @@ const renderIcon = (type: string) =>
     delivery: notificationIcons.delivery,
   })[type];
 
-export function NotificationItem({ notification, onOpen, onOpenLink }: NotificationItemProps) {
+export function NotificationItem({ notification, onOpen }: NotificationItemProps) {
   const renderAvatar = () => (
     <ListItemAvatar>
       {notification.avatarUrl ? (
@@ -178,10 +180,6 @@ export function NotificationItem({ notification, onOpen, onOpenLink }: Notificat
       type="button"
       className="p-2.5 items-start border-b border-dashed border-border relative w-full"
       onClick={() => onOpen?.(notification)}
-      onDoubleClick={() => {
-        onOpen?.(notification);
-        if (notification.url) onOpenLink?.(notification);
-      }}
     >
       {renderUnReadBadge()}
       {renderAvatar()}

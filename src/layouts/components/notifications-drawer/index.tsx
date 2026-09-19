@@ -20,42 +20,36 @@ import { Box, Tab, Badge, Drawer, Button, Tooltip, Typography, IconButton } from
 
 import { NotificationItem } from './notification-item';
 import { _NotificationApi, type NotificationApiItem } from './api/notification.services';
+import {
+  notificationIconType,
+  resolveNotificationHref,
+} from './utils/resolve-notification-path';
 
 // ----------------------------------------------------------------------
 
 function mapApiToNotification(
   item: NotificationApiItem
 ): NotificationItemProps['notification'] {
+  const target = {
+    url: item.url,
+    type: item.type,
+    entityId: item.entityId,
+    title: item.title,
+    body: item.body,
+  };
+
   return {
     id: item.id,
-    type: 'mail',
+    type: notificationIconType(target),
     title: item.title,
     category: item.body || '',
     isUnRead: item.read_at === null,
     avatarUrl: null,
     createdAt: item.created_at,
-    url: item.url,
+    url: resolveNotificationHref(target),
+    entityType: item.type,
+    entityId: item.entityId,
   };
-}
-
-function resolveNotificationPath(url: string): string | null {
-  const trimmed = url.trim();
-  if (!trimmed) return null;
-
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-    try {
-      const parsed = new URL(trimmed);
-      if (parsed.origin === window.location.origin) {
-        return `${parsed.pathname}${parsed.search}${parsed.hash}`;
-      }
-    } catch {
-      return null;
-    }
-    window.location.assign(trimmed);
-    return null;
-  }
-
-  return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 }
 
 // ----------------------------------------------------------------------
@@ -135,13 +129,25 @@ export function NotificationsDrawer({ data = [], className, ...other }: Notifica
 
   const followNotificationLink = useCallback(
     (notification: NotificationItemProps['notification']) => {
-      if (!notification.url) return;
-      const path = resolveNotificationPath(notification.url);
-      if (path) {
-        onClose();
-        setSelectedNotification(null);
-        navigate(path);
+      const href = resolveNotificationHref({
+        url: notification.url,
+        type: notification.entityType,
+        entityId: notification.entityId,
+        title: notification.title,
+        body: notification.category,
+      });
+      if (!href) return false;
+
+      onClose();
+      setSelectedNotification(null);
+
+      if (href.startsWith('http://') || href.startsWith('https://')) {
+        window.location.assign(href);
+        return true;
       }
+
+      navigate(href);
+      return true;
     },
     [navigate, onClose]
   );
@@ -149,9 +155,12 @@ export function NotificationsDrawer({ data = [], className, ...other }: Notifica
   const handleOpenNotification = useCallback(
     (notification: NotificationItemProps['notification']) => {
       markRead(notification);
-      setSelectedNotification(notification);
+      const opened = followNotificationLink(notification);
+      if (!opened) {
+        setSelectedNotification(notification);
+      }
     },
-    [markRead]
+    [followNotificationLink, markRead]
   );
 
   const handleBellClick = (event: React.MouseEvent<HTMLButtonElement>) => {

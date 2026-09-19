@@ -11,6 +11,8 @@ export type NotificationApiItem = {
   read_at: string | null;
   created_at: string;
   url?: string | null;
+  type?: string | null;
+  entityId?: string | null;
 };
 
 export type NotificationListResponse = {
@@ -39,6 +41,36 @@ function firstString(...values: unknown[]): string | null {
   return null;
 }
 
+function asNumericId(value: unknown): string | null {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return String(value);
+  if (typeof value === 'string' && /^\d+$/.test(value.trim())) return value.trim();
+  return null;
+}
+
+function pickEntityId(
+  item: Record<string, unknown>,
+  nested: Record<string, unknown>
+): string | null {
+  return (
+    asNumericId(nested.custom_order_request_id) ??
+    asNumericId(item.custom_order_request_id) ??
+    asNumericId(nested.customOrderRequestId) ??
+    asNumericId(nested.custom_order_id) ??
+    asNumericId(item.custom_order_id) ??
+    asNumericId(nested.request_id) ??
+    asNumericId(item.request_id) ??
+    asNumericId(nested.entity_id) ??
+    asNumericId(item.entity_id) ??
+    asNumericId(nested.model_id) ??
+    asNumericId(item.model_id) ??
+    asNumericId(nested.resource_id) ??
+    asNumericId(nested.related_id) ??
+    asNumericId(nested.notifiable_id) ??
+    asNumericId(item.notifiable_id) ??
+    asNumericId(nested.id)
+  );
+}
+
 export function normalizeNotificationItem(raw: unknown): NotificationApiItem | null {
   const item = asRecord(raw);
   if (!item) return null;
@@ -61,6 +93,17 @@ export function normalizeNotificationItem(raw: unknown): NotificationApiItem | n
       nested.link,
       nested.target_page
     ),
+    type: firstString(
+      item.type,
+      item.notification_type,
+      nested.type,
+      nested.notification_type,
+      nested.model,
+      nested.entity_type,
+      item.notifiable_type,
+      nested.notifiable_type
+    ),
+    entityId: pickEntityId(item, nested),
   };
 }
 
