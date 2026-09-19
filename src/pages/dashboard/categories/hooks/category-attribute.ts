@@ -99,6 +99,7 @@ export const useUpdateCategoryAttribute = () => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.categoryAttribute.details(variables.id),
       });
+      queryClient.invalidateQueries({ queryKey: ['product'] });
     },
   });
 };

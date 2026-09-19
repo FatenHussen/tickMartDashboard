@@ -6,24 +6,16 @@ import { queryKeys } from '@/api/queryKeys';
 import { useQuery } from '@tanstack/react-query';
 import { Iconify } from '@/shared/components/iconify';
 import { _ColorApi } from '@/pages/dashboard/colors/api/color.services';
-import {
-  Select,
-  SelectItem,
-  SelectValue,
-  SelectContent,
-  SelectTrigger,
-} from '@/shared/ui/select';
 
 import { Box, Button, Typography } from 'src/shared/ui';
 
-import { VariantFieldLabel, ColorAttributeOption } from './variant-field-ui';
+import { AttributeSingleSelect } from './VariantAttributeSelects';
 import {
   sortedComboKey,
   generateVariantSku,
-  attributeValueLabel,
   buildColorsHexLookup,
   resolveAttributeValuesByIds,
-  resolveCategoryAttributeValueHex,
+  type CategoryAttributePickerRow,
 } from '../utils/variant-combinations';
 
 // ----------------------------------------------------------------------
@@ -46,94 +38,14 @@ export type GeneratedVariantRow = {
   is_active: 1;
 };
 
-type CategoryAttributeRow = {
-  id: number;
-  name?: { ar?: string; en?: string } | string;
-  type?: string;
-  values?: Array<{
-    id: number;
-    name?: { ar?: string; en?: string } | string;
-    hex?: string | null;
-    color_hex?: string | null;
-    color?: { hex?: string } | null;
-  }>;
-};
-
-const selectTriggerCls =
-  'h-10 w-full rounded-lg border border-border/45 bg-background px-3 text-sm shadow-none transition-colors hover:border-border focus:border-primary/50 focus:ring-1 focus:ring-primary/15';
-
-/** Radix Select cannot use an empty string; this marks an unset optional attribute. */
-const ATTRIBUTE_NONE_VALUE = '__none__';
-
 type Props = {
-  categoryAttributes: CategoryAttributeRow[];
+  categoryAttributes: CategoryAttributePickerRow[];
   productSku: string;
   existingComboKeys: Set<string>;
   onAdd: (row: GeneratedVariantRow) => void;
   t: TFunction;
   formatAttributeLabel: (name: unknown) => string;
 };
-
-function AttributeSingleSelect({
-  attr,
-  selectedId,
-  onChange,
-  colorsHexLookup,
-  formatAttributeLabel,
-  resetNonce,
-}: {
-  attr: CategoryAttributeRow;
-  selectedId: number;
-  onChange: (valueId: number) => void;
-  colorsHexLookup: ReturnType<typeof buildColorsHexLookup>;
-  formatAttributeLabel: (name: unknown) => string;
-  /** Bumps after each successful add so Radix Select remounts with empty value. */
-  resetNonce: number;
-}) {
-  const values = Array.isArray(attr.values) ? attr.values : [];
-  const label = formatAttributeLabel(attr.name);
-  const isColor = String(attr.type ?? '').toLowerCase() === 'color';
-
-  return (
-    <Box className="min-w-0 space-y-1">
-      <VariantFieldLabel>{label}</VariantFieldLabel>
-      <Select
-        key={`${attr.id}-${resetNonce}`}
-        value={selectedId > 0 ? String(selectedId) : ATTRIBUTE_NONE_VALUE}
-        onValueChange={(v) => onChange(v === ATTRIBUTE_NONE_VALUE ? 0 : Number(v))}
-      >
-        <SelectTrigger className={selectTriggerCls}>
-          <SelectValue placeholder="—" />
-        </SelectTrigger>
-        <SelectContent className="max-h-64 min-w-[var(--radix-select-trigger-width)] p-1">
-          <SelectItem value={ATTRIBUTE_NONE_VALUE} textValue="—" className="rounded-md py-2">
-            <span className="text-muted-foreground">—</span>
-          </SelectItem>
-          {values.map((val) => {
-            const valLabel = attributeValueLabel(val.name) || String(val.id);
-            const valHex = isColor
-              ? resolveCategoryAttributeValueHex(val, colorsHexLookup)
-              : null;
-            return (
-              <SelectItem
-                key={val.id}
-                value={String(val.id)}
-                textValue={valLabel}
-                className="rounded-md py-2"
-              >
-                {isColor ? (
-                  <ColorAttributeOption hex={valHex} label={valLabel} />
-                ) : (
-                  valLabel
-                )}
-              </SelectItem>
-            );
-          })}
-        </SelectContent>
-      </Select>
-    </Box>
-  );
-}
 
 export function VariantGeneratorPanel({
   categoryAttributes,

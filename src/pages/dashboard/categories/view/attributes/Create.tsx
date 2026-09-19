@@ -90,7 +90,7 @@ export default function CreatePage() {
     defaultValues,
   });
 
-  const { handleSubmit, reset, control, setValue } = methods;
+  const { handleSubmit, reset, control, setValue, formState } = methods;
   const attributeType = useWatch({ control, name: 'type' });
   const watchedValues = useWatch({ control, name: 'values' });
   const { fields, append, remove } = useFieldArray({
@@ -169,6 +169,7 @@ export default function CreatePage() {
         return;
       }
 
+      const valuesTouched = Boolean(formState.dirtyFields.values);
       const payload = {
         category_id: data.category_id,
         name: {
@@ -176,7 +177,7 @@ export default function CreatePage() {
           ar: data.name.ar,
         },
         type: data.type,
-        ...(data.type !== 'color'
+        ...(data.type !== 'color' && (!isEditMode || valuesTouched)
           ? {
               values: data.values.map(toCategoryAttributeValuePayload),
             }
@@ -414,9 +415,10 @@ export default function CreatePage() {
             <Box className="p-6 space-y-4">
               {fields.map((field, index) => {
                 const canRemove = fields.length > 1;
+                const valueId = Number((field as { id?: number }).id);
                 return (
                   <Box
-                    key={field.id ?? field.fieldKey}
+                    key={Number.isInteger(valueId) && valueId > 0 ? valueId : field.fieldKey}
                     className="p-4 rounded-xl border border-border/60 bg-muted/25 space-y-3"
                   >
                     <Box className="flex flex-wrap items-center justify-between gap-3">

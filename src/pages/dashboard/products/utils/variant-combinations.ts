@@ -177,15 +177,18 @@ export function randomVariantSkuSuffix(length = 6): string {
   return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
-/** Readable English SKU from product base + attribute values (no Arabic). */
+/** Readable English SKU from product base + `name.en` (or a random suffix — never `name.ar`). */
 export function generateVariantSku(
   productSku: string | null | undefined,
   attributeValues: CategoryAttributeValueRef[],
   lookup?: ColorsHexLookup | null
 ): string {
   const base = sanitizeSkuBase(productSku);
-  const parts = attributeValues.map((v) => attributeValueSkuPart(v, lookup)).filter(Boolean);
-  return parts.length > 0 ? `${base}-${parts.join('-')}` : base;
+  const parts = attributeValues
+    .map((v) => attributeValueSkuPart(v, lookup))
+    .filter((part) => part && !/^\d+$/.test(part));
+  if (parts.length > 0) return `${base}-${parts.join('-')}`;
+  return `${base}-${randomVariantSkuSuffix(6)}`;
 }
 
 /** Explicit regenerate (refresh button) — always returns a new SKU (random suffix). */
@@ -260,4 +263,178 @@ export function resolveAttributeValuesByIds(
     }
   }
   return valueIds.map((id) => byId.get(id)).filter((v): v is CategoryAttributeValueRef => v != null);
+}
+
+/** One category attribute + its values — bind selects by these IDs, never by name. */
+export type CategoryAttributePickerRow = {
+  id: number;
+  name?: { ar?: string; en?: string } | string;
+  type?: string;
+  values?: CategoryAttributeValueRef[];
+};
+
+export function toCategoryAttributePickerRows(raw: unknown): CategoryAttributePickerRow[] {
+  if (!Array.isArray(raw)) return [];
+  const rows: CategoryAttributePickerRow[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const rec = item as {
+      id?: unknown;
+      name?: CategoryAttributePickerRow['name'];
+      type?: string;
+      values?: CategoryAttributeValueRef[];
+    };
+    const id = Number(rec.id);
+    if (!Number.isInteger(id) || id <= 0) continue;
+    const values = (Array.isArray(rec.values) ? rec.values : []).filter((val) => {
+      const valueId = Number(val?.id);
+      return Number.isInteger(valueId) && valueId > 0;
+    });
+    rows.push({
+      id,
+      name: rec.name,
+      type: rec.type,
+      values,
+    });
+  }
+  return rows;
+}
+
+/**
+ * Always one select per GET `attributes[]` row (color + size).
+ * If `/category-attributes` omitted a row, synthesize it from the product payload.
+ */
+export function ensureCategoryAttributesFromVariants(
+  rows: CategoryAttributePickerRow[],
+  variants: Array<{
+    attributes?: Array<{
+      id?: number;
+      value_id?: number;
+      value?: string;
+      attribute?: string;
+      type?: string;
+      category_attribute_id?: number;
+    }>;
+  }>
+): CategoryAttributePickerRow[] {
+  const byId = new Map<number, CategoryAttributePickerRow>();
+  for (const row of rows) {
+    byId.set(row.id, { ...row, values: [...(row.values ?? [])] });
+  }
+
+  for (const variant of variants) {
+    for (const attr of variant.attributes ?? []) {
+      const attributeId = parsePositiveId(attr.category_attribute_id);
+      if (attributeId == null) continue;
+      const existing = byId.get(attributeId);
+      const valueId = parsePositiveId(attr.id ?? attr.value_id);
+      const nextValues = [...(existing?.values ?? [])];
+      if (valueId != null && !nextValues.some((val) => Number(val.id) === valueId)) {
+        nextValues.push({
+          id: valueId,
+          name: attr.value,
+        });
+      }
+      byId.set(attributeId, {
+        id: attributeId,
+        name: existing?.name ?? attr.attribute,
+        type: existing?.type ?? attr.type,
+        values: nextValues,
+      });
+    }
+  }
+
+  return [...byId.values()];
+}
+
+export type VariantAttributeRow = {
+  id?: number;
+  value_id?: number;
+  category_attribute_id?: number;
+};
+
+function parsePositiveId(value: unknown): number | null {
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+/** Selected value for this attribute from `attributes_values_ids` ∩ `values[].id`. */
+export function selectedValueIdForAttribute(
+  selectedIds: number[],
+  attribute: CategoryAttributePickerRow,
+  _variantAttributes?: VariantAttributeRow[] | null
+): number | null {
+  const valueIds = new Set(
+    (attribute.values ?? []).map((val) => parsePositiveId(val.id)).filter((id): id is number => id != null)
+  );
+  return selectedIds.map(parsePositiveId).find((id) => id != null && valueIds.has(id)) ?? null;
+}
+
+/** Same as {@link selectedValueIdForAttribute}, then GET `attributes[]` by `category_attribute_id`. */
+export function resolveAttributeValueId(
+  selectedIds: number[],
+  attribute: CategoryAttributePickerRow,
+  variantAttributes?: VariantAttributeRow[] | null
+): number | null {
+  const fromSelected = selectedValueIdForAttribute(selectedIds, attribute);
+  if (fromSelected != null) return fromSelected;
+
+  const attributeId = parsePositiveId(attribute.id);
+  if (attributeId == null || !Array.isArray(variantAttributes)) return null;
+  const row = variantAttributes.find(
+    (item) => parsePositiveId(item.category_attribute_id) === attributeId
+  );
+  return parsePositiveId(row?.id ?? row?.value_id);
+}
+
+/** Fill empty attribute slots from GET — never drop size when the form only has color. */
+export function mergeVariantAttributeValueIds(
+  formIds: number[],
+  apiIds: number[],
+  categoryAttributes: CategoryAttributePickerRow[],
+  variantAttributes?: VariantAttributeRow[] | null
+): number[] {
+  const form = formIds.map(parsePositiveId).filter((id): id is number => id != null);
+  const api = apiIds.map(parsePositiveId).filter((id): id is number => id != null);
+
+  if (categoryAttributes.length === 0) {
+    return [...new Set([...form, ...api])];
+  }
+
+  const result: number[] = [];
+  const seen = new Set<number>();
+  const push = (id: number | null) => {
+    if (id == null || seen.has(id)) return;
+    seen.add(id);
+    result.push(id);
+  };
+
+  for (const attr of categoryAttributes) {
+    const current = selectedValueIdForAttribute(form, attr);
+    if (current != null) {
+      push(current);
+      continue;
+    }
+    push(resolveAttributeValueId(api, attr, variantAttributes));
+  }
+
+  for (const id of form) push(id);
+  return result;
+}
+
+/** Replace this attribute's value in `attributes_values_ids` — other attributes stay put. */
+export function replaceAttributeValueId(
+  selectedIds: number[],
+  attribute: CategoryAttributePickerRow,
+  nextValueId: number | null
+): number[] {
+  const valueIds = new Set(
+    (attribute.values ?? []).map((val) => parsePositiveId(val.id)).filter((id): id is number => id != null)
+  );
+  const kept = selectedIds
+    .map(parsePositiveId)
+    .filter((id): id is number => id != null && !valueIds.has(id));
+  const next = parsePositiveId(nextValueId);
+  if (next != null) kept.push(next);
+  return [...new Set(kept)];
 }

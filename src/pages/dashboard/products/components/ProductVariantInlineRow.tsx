@@ -11,42 +11,25 @@ import type {
 import React from 'react';
 import { Controller } from 'react-hook-form';
 import { Iconify } from '@/shared/components/iconify';
+import { formatTranslated } from '@/utils/format-translated';
 
 import { Box, Button, Typography } from 'src/shared/ui';
 
 import { VariantImagesField } from './VariantImagesField';
 import { ProductPricingFields } from './ProductPricingFields';
-import { ProductShopVariantsSection } from '../view/product/ProductShopVariantsSection';
+import { VariantAttributeSelects } from './VariantAttributeSelects';
 import {
-  toTwoDecimalNumber,
-  optionalNumberInputDisplay,
-} from './variant-field-helpers';
-import {
+  sortedComboKey,
   regenerateVariantSku,
   type ColorsHexLookup,
   type CategoryAttributeValueRef,
+  type CategoryAttributePickerRow,
+  type VariantAttributeRow,
 } from '../utils/variant-combinations';
 import {
-  VariantFieldLabel,
   VariantStatusBadge,
   VariantAttributeChain,
-  variantFieldInputClass,
 } from './variant-field-ui';
-
-// ----------------------------------------------------------------------
-
-function fieldInputClass(error?: boolean) {
-  return variantFieldInputClass(error);
-}
-
-function FieldErrorText({ message }: { message?: string }) {
-  if (!message) return null;
-  return (
-    <Typography variant="caption" className="text-destructive mt-0.5 block">
-      {message}
-    </Typography>
-  );
-}
 
 export type ProductVariantInlineRowProps = {
   variantIndex: number;
@@ -56,6 +39,8 @@ export type ProductVariantInlineRowProps = {
   setValue: UseFormSetValue<ProductFormValues>;
   errors: FieldErrors<ProductFormValues>;
   valueRefs: CategoryAttributeValueRef[];
+  categoryAttributes: CategoryAttributePickerRow[];
+  variantAttributes?: VariantAttributeRow[] | null;
   colorsHexLookup: ColorsHexLookup;
   productDualPriceReady: boolean;
   usdCurrency?: CurrencyData;
@@ -64,24 +49,8 @@ export type ProductVariantInlineRowProps = {
   watchedProductSku: string;
   restaurantMode: boolean;
   isEditMode: boolean;
-  isShopSaleChannel: boolean;
   productId?: string;
   productResponse?: { variants?: Array<{ id: number; images?: Array<{ id: number; url: string }> }> };
-  shops: unknown[];
-  shopVariantsFields: unknown[];
-  watchedShopVariants: ProductFormValues['shop_variants'];
-  appendShopVariant: (row: NonNullable<ProductFormValues['shop_variants']>[number]) => void;
-  removeShopVariant: (index: number) => void;
-  shopVariantCreateBusyIdx: number | null;
-  setShopVariantCreateBusyIdx: (v: number | null) => void;
-  updateShopVariantMutation: { isPending: boolean; mutateAsync: (args: any) => Promise<any> };
-  createSingleShopVariantOnProduct: (args: {
-    productId: number | string;
-    parentVariantId: number;
-    parentVariantIndex: number;
-    shopId: number;
-    costPrice: number | undefined;
-  }) => Promise<number>;
   onRemove: () => void;
   onSave: () => void | Promise<void>;
   isSaving: boolean;
@@ -99,6 +68,8 @@ export function ProductVariantInlineRow({
   setValue,
   errors,
   valueRefs,
+  categoryAttributes,
+  variantAttributes,
   colorsHexLookup,
   productDualPriceReady,
   usdCurrency: _usdCurrency,
@@ -107,18 +78,8 @@ export function ProductVariantInlineRow({
   watchedProductSku,
   restaurantMode,
   isEditMode,
-  isShopSaleChannel,
-  productId,
+  productId: _productId,
   productResponse: _productResponse,
-  shops,
-  shopVariantsFields,
-  watchedShopVariants,
-  appendShopVariant,
-  removeShopVariant,
-  shopVariantCreateBusyIdx,
-  setShopVariantCreateBusyIdx,
-  updateShopVariantMutation,
-  createSingleShopVariantOnProduct,
   onRemove,
   onSave,
   isSaving,
@@ -130,11 +91,14 @@ export function ProductVariantInlineRow({
   const variantRowErrors = errors.variants?.[variantIndex];
   const variantId = watch(`variants.${variantIndex}.id`);
   const isActive = Number(watch(`variants.${variantIndex}.is_active`) ?? 1) === 1;
-  const shopSvIndex = React.useMemo(() => {
-    const rows = watchedShopVariants ?? [];
-    return rows.findIndex((sv) => Number(sv?.variant_index) === variantIndex);
-  }, [watchedShopVariants, variantIndex]);
-
+  const selectedIds = (watch(`variants.${variantIndex}.attributes_values_ids`) ?? []) as number[];
+  const existingComboKeys = new Set(
+    (watch('variants') ?? []).flatMap((row, index) => {
+      if (index === variantIndex) return [];
+      const ids = (row?.attributes_values_ids ?? []).map(Number).filter((n) => n > 0);
+      return ids.length > 0 ? [sortedComboKey(ids)] : [];
+    })
+  );
   return (
     <Box className="overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
       <Box
@@ -186,12 +150,33 @@ export function ProductVariantInlineRow({
       {isExpanded ? (
         <>
       <Box className="space-y-4 p-5">
+        {categoryAttributes.length > 0 ? (
+          <Box className="space-y-2">
+            <VariantAttributeSelects
+              categoryAttributes={categoryAttributes}
+              selectedIds={selectedIds}
+              variantAttributes={variantAttributes}
+              existingComboKeys={existingComboKeys}
+              formatAttributeLabel={(name) =>
+                formatTranslated(name as Parameters<typeof formatTranslated>[0], '')
+              }
+              t={t}
+              onChange={(nextIds) =>
+                setValue(`variants.${variantIndex}.attributes_values_ids`, nextIds, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+              }
+            />
+          </Box>
+        ) : null}
         <Box className="space-y-3">
           <ProductPricingFields
             prefix={`variants.${variantIndex}`}
             control={control}
             watch={watch}
             setValue={setValue}
+            title={t('form.variantBasicInfoSectionTitle')}
             usdLabel={t('form.variantPriceUsdLabel')}
             sypLabel={t('form.variantPriceSypLabel')}
             skuLabel={t('form.variantSku')}
@@ -210,35 +195,6 @@ export function ProductVariantInlineRow({
             }
             t={t}
           />
-
-          {isShopSaleChannel && shopSvIndex >= 0 ? (
-            <Box className="max-w-xs">
-              <VariantFieldLabel>
-                {t('form.productCostPriceOptional')}
-              </VariantFieldLabel>
-              <Controller
-                name={`shop_variants.${shopSvIndex}.cost_price`}
-                control={control}
-                render={({ field: f, fieldState: { error } }) => (
-                  <div>
-                    <input
-                      type="number"
-                      name={f.name}
-                      ref={f.ref}
-                      onBlur={f.onBlur}
-                      value={optionalNumberInputDisplay(f.value)}
-                      placeholder="—"
-                      onChange={(e) => f.onChange(toTwoDecimalNumber(e.target.value))}
-                      className={fieldInputClass(!!error)}
-                      step="0.01"
-                      min={0}
-                    />
-                    <FieldErrorText message={error?.message} />
-                  </div>
-                )}
-              />
-            </Box>
-          ) : null}
         </Box>
 
         <VariantImagesField
@@ -293,29 +249,6 @@ export function ProductVariantInlineRow({
         />
         </Box>
       </Box>
-
-      {isShopSaleChannel ? (
-        <Box className="px-5 pb-5">
-        <ProductShopVariantsSection
-          variantIndex={variantIndex}
-          hideCostPrice
-          shops={shops as Parameters<typeof ProductShopVariantsSection>[0]['shops']}
-          shopVariantsFields={shopVariantsFields as Parameters<typeof ProductShopVariantsSection>[0]['shopVariantsFields']}
-          watchedShopVariants={watchedShopVariants ?? []}
-          control={control}
-          watch={watch}
-          setValue={setValue}
-          appendShopVariant={appendShopVariant}
-          removeShopVariant={removeShopVariant}
-          isEditMode={isEditMode}
-          productId={productId}
-          shopVariantCreateBusyIdx={shopVariantCreateBusyIdx}
-          setShopVariantCreateBusyIdx={setShopVariantCreateBusyIdx}
-          updateShopVariantMutation={updateShopVariantMutation}
-          createSingleShopVariantOnProduct={createSingleShopVariantOnProduct}
-        />
-        </Box>
-      ) : null}
 
       {variantRowErrors ? (
         <Typography variant="caption" className="text-destructive px-5 pb-3">

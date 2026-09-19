@@ -17,17 +17,20 @@ import { _ColorApi } from '@/pages/dashboard/colors/api/color.services';
 import { Box, Typography } from 'src/shared/ui';
 
 import { ProductVariantInlineRow } from './ProductVariantInlineRow';
+import { isHiddenDefaultVariant } from '../utils/variant-payload';
 import {
   buildColorsHexLookup,
   type ColorsHexLookup,
+  type CategoryAttributePickerRow,
   type CategoryAttributeValueRef,
+  type VariantAttributeRow,
 } from '../utils/variant-combinations';
 
 // ----------------------------------------------------------------------
 
 export type ProductVariantsCardListProps = {
   variants: Array<{ id: string }>;
-  categoryAttributes: Array<{ id?: number; values?: CategoryAttributeValueRef[] }>;
+  categoryAttributes: CategoryAttributePickerRow[];
   resolveValueRefs: (valueIds: number[]) => CategoryAttributeValueRef[];
   control: Control<ProductFormValues>;
   watch: UseFormWatch<ProductFormValues>;
@@ -39,24 +42,14 @@ export type ProductVariantsCardListProps = {
   watchedProductSku: string;
   restaurantMode: boolean;
   isEditMode: boolean;
-  isShopSaleChannel: boolean;
   productId?: string;
-  productResponse?: { variants?: Array<{ id: number; images?: Array<{ id: number; url: string }> }> };
-  shops: unknown[];
-  shopVariantsFields: unknown[];
-  watchedShopVariants: ProductFormValues['shop_variants'];
-  appendShopVariant: (row: NonNullable<ProductFormValues['shop_variants']>[number]) => void;
-  removeShopVariant: (index: number) => void;
-  shopVariantCreateBusyIdx: number | null;
-  setShopVariantCreateBusyIdx: (v: number | null) => void;
-  updateShopVariantMutation: { isPending: boolean; mutateAsync: (args: any) => Promise<any> };
-  createSingleShopVariantOnProduct: (args: {
-    productId: number | string;
-    parentVariantId: number;
-    parentVariantIndex: number;
-    shopId: number;
-    costPrice: number | undefined;
-  }) => Promise<number>;
+  productResponse?: {
+    variants?: Array<{
+      id: number;
+      images?: Array<{ id: number; url: string }>;
+      attributes?: VariantAttributeRow[];
+    }>;
+  };
   onRemove: (variantIndex: number) => void;
   onSave: (variantIndex: number) => void | Promise<void>;
   isSavingIndex?: number | null;
@@ -67,7 +60,7 @@ export type ProductVariantsCardListProps = {
 
 export function ProductVariantsCardList({
   variants,
-  categoryAttributes: _categoryAttributes,
+  categoryAttributes,
   resolveValueRefs,
   isSavingIndex = null,
   updatePending = false,
@@ -103,7 +96,19 @@ export function ProductVariantsCardList({
     prevLenRef.current = next;
   }, [variants.length]);
 
-  if (variants.length === 0) {
+  const visibleIndices = variants
+    .map((_, variantIndex) => variantIndex)
+    .filter((variantIndex) => {
+      if (rowProps.restaurantMode) return false;
+      return !isHiddenDefaultVariant(
+        {
+          attributes_values_ids: rowProps.watch(`variants.${variantIndex}.attributes_values_ids`),
+        },
+        categoryAttributes.length
+      );
+    });
+
+  if (visibleIndices.length === 0) {
     return (
       <Box className="rounded-2xl border border-dashed border-border/50 bg-muted/10 px-6 py-12 text-center">
         <Box className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted/50 text-muted-foreground">
@@ -118,10 +123,15 @@ export function ProductVariantsCardList({
 
   return (
     <Box className="space-y-3">
-      {variants.map((variant, variantIndex) => {
+      {visibleIndices.map((variantIndex) => {
+        const variant = variants[variantIndex];
         const rowSelectedIds = (rowProps.watch(`variants.${variantIndex}.attributes_values_ids`) ||
           []) as number[];
         const valueRefs = resolveValueRefs(rowSelectedIds);
+        const rowVariantId = Number(rowProps.watch(`variants.${variantIndex}.id`));
+        const variantAttributes =
+          rowProps.productResponse?.variants?.find((item) => Number(item.id) === rowVariantId)
+            ?.attributes ?? null;
 
         return (
           <ProductVariantInlineRow
@@ -129,6 +139,8 @@ export function ProductVariantsCardList({
             variantIndex={variantIndex}
             variantFieldId={variant.id}
             valueRefs={valueRefs}
+            categoryAttributes={categoryAttributes}
+            variantAttributes={variantAttributes}
             colorsHexLookup={colorsHexLookup}
             {...rowProps}
             onRemove={() => onRemove(variantIndex)}

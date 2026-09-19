@@ -300,15 +300,9 @@ function ShopVariantRowEditor({
     );
   };
 
-  const shopName =
-    typeof shopVariant.shop?.name === 'string'
-      ? shopVariant.shop.name
-      : formatTranslated(shopVariant.shop?.name as Parameters<typeof formatTranslated>[0]);
-
   if (!canEdit) {
     return (
       <div className="grid grid-cols-1 gap-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm sm:grid-cols-2">
-        <div className="font-medium text-foreground">{shopName}</div>
         <div>
           <span className="text-muted-foreground">{labels.cost}: </span>
           {shopVariant.cost_price ?? '—'}
@@ -319,7 +313,6 @@ function ShopVariantRowEditor({
 
   return (
     <div className="flex flex-wrap items-end gap-3 rounded-md border border-border/60 bg-muted/10 px-3 py-3">
-      <div className="min-w-[120px] text-sm font-medium text-foreground">{shopName}</div>
       <div className="flex min-w-0 flex-col gap-1">
         <span className="text-xs leading-snug text-muted-foreground">{labels.cost}</span>
         <Input
@@ -698,19 +691,15 @@ export function ProductVariantsPriceModal({
                       dualPriceReady={productDualPriceReady}
                       sypRate={sypRate}
                     />
-                    {(variant.shop_variants ?? []).length === 0 ? (
-                      <p className="text-sm text-muted-foreground">{t('productVariantsModalNoShops')}</p>
-                    ) : (
-                      variant.shop_variants.map((sv) => (
-                        <ShopVariantRowEditor
-                          key={sv.id}
-                          shopVariant={sv}
-                          canEdit={canEditShopPrices}
-                          onSuccess={() => refetch()}
-                          labels={labels}
-                        />
-                      ))
-                    )}
+                    {(variant.shop_variants ?? []).slice(0, 1).map((sv) => (
+                      <ShopVariantRowEditor
+                        key={sv.id}
+                        shopVariant={sv}
+                        canEdit={canEditShopPrices}
+                        onSuccess={() => refetch()}
+                        labels={labels}
+                      />
+                    ))}
                   </div>
                 </div>
               );

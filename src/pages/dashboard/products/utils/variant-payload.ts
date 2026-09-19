@@ -24,6 +24,105 @@ function toIdList(value: unknown): number[] {
   return value.map(Number).filter((n) => Number.isFinite(n) && n > 0);
 }
 
+/**
+ * Persist GET `attributes_values_ids` plus `attributes[].id` (one per
+ * `category_attribute_id`). Color-only `attributes_values_ids` still keeps size
+ * from `attributes[]`. Never rebuild IDs from the display label.
+ */
+export function extractVariantAttributeValueIds(variant: unknown): number[] {
+  if (!variant || typeof variant !== 'object') return [];
+  const v = variant as Record<string, unknown>;
+  const direct = toIdList(v.attributes_values_ids ?? v.attributeValueIds);
+
+  const byAttribute = new Map<number, number>();
+  const ungrouped: number[] = [];
+  if (Array.isArray(v.attributes)) {
+    for (const item of v.attributes) {
+      if (!item || typeof item !== 'object') continue;
+      const rec = item as Record<string, unknown>;
+      const valueId = toIdList([rec.value_id ?? rec.attribute_value_id ?? rec.id])[0];
+      if (!valueId) continue;
+      const attributeId = toIdList([rec.category_attribute_id])[0];
+      if (attributeId) byAttribute.set(attributeId, valueId);
+      else ungrouped.push(valueId);
+    }
+  }
+
+  if (byAttribute.size === 0 && ungrouped.length === 0) {
+    return [...new Set(direct)];
+  }
+
+  const merged = [...direct];
+  const seen = new Set(direct);
+  for (const valueId of byAttribute.values()) {
+    if (seen.has(valueId)) continue;
+    seen.add(valueId);
+    merged.push(valueId);
+  }
+  for (const valueId of ungrouped) {
+    if (seen.has(valueId)) continue;
+    seen.add(valueId);
+    merged.push(valueId);
+  }
+  return merged;
+}
+
+export type ShopVariantIndexRow = {
+  id?: number;
+  shop_id: number;
+  variant_index: number;
+  cost_price?: number;
+};
+
+/**
+ * One `shop_variants` row per (shop_id × variant_index).
+ * Sending a shop for index 0 only leaves later SKUs unlinkable on the site.
+ */
+export function expandShopVariantsForAllIndexes<T extends ShopVariantIndexRow>(
+  rows: T[] | undefined,
+  variantCount: number
+): T[] {
+  if (variantCount <= 0) return [];
+  const list = (rows ?? []).filter(
+    (row) => Number(row?.shop_id) > 0 && Number(row?.variant_index) >= 0
+  );
+  if (list.length === 0) return [];
+
+  const shops = new Map<number, { shop_id: number; cost_price?: number }>();
+  for (const row of list) {
+    const shopId = Number(row.shop_id);
+    if (!shops.has(shopId)) {
+      shops.set(shopId, {
+        shop_id: shopId,
+        ...(row.cost_price !== undefined ? { cost_price: row.cost_price } : {}),
+      });
+    }
+  }
+
+  const existing = new Map<string, T>();
+  for (const row of list) {
+    existing.set(`${Number(row.variant_index)}:${Number(row.shop_id)}`, row);
+  }
+
+  const out: T[] = [];
+  for (let variantIndex = 0; variantIndex < variantCount; variantIndex += 1) {
+    for (const shop of shops.values()) {
+      const key = `${variantIndex}:${shop.shop_id}`;
+      const prev = existing.get(key);
+      if (prev) {
+        out.push(prev);
+        continue;
+      }
+      out.push({
+        shop_id: shop.shop_id,
+        variant_index: variantIndex,
+        ...(shop.cost_price !== undefined ? { cost_price: shop.cost_price } : {}),
+      } as T);
+    }
+  }
+  return out;
+}
+
 function sameIdSet(a: number[], b: number[]): boolean {
   if (a.length !== b.length) return false;
   const left = [...a].sort((x, y) => x - y);
@@ -122,7 +221,7 @@ export function toVariantPayload(
   const imageFields = variantImageFieldsFromRow(r, options);
 
   const payload: VariantPayloadRow = {
-    attributes_values_ids: toIdList(r.attributes_values_ids ?? r.attributeValueIds),
+    attributes_values_ids: extractVariantAttributeValueIds(r),
     ...imageFields,
   };
 
@@ -140,11 +239,8 @@ export function toVariantPayload(
 
   const price = toFiniteNumber(r.price);
   const priceSyp = toFiniteNumber(r.price_syp);
-  if (price !== undefined) {
-    payload.price = price;
-  } else if (priceSyp !== undefined) {
-    payload.price_syp = priceSyp;
-  }
+  if (price !== undefined) payload.price = price;
+  if (priceSyp !== undefined) payload.price_syp = priceSyp;
   const quantity = toFiniteNumber(r.quantity);
   if (quantity !== undefined) payload.quantity = Math.max(0, Math.floor(quantity));
 
@@ -163,8 +259,7 @@ export function toVariantPayload(
 
   const isTrend = toFlag01(r.is_trend ?? r.isTrend, 0);
   if (isTrend !== undefined) payload.is_trend = isTrend;
-  const isActive = toFlag01(r.is_active ?? r.isActive, 1);
-  if (isActive !== undefined) payload.is_active = isActive;
+  payload.is_active = toFlag01(r.is_active ?? r.isActive, 1) ?? 1;
 
   return payload;
 }
@@ -198,6 +293,18 @@ export function toVariantPayloadList(
     .filter((row): row is VariantPayloadRow => row != null);
 }
 
+/**
+ * Backend seeds a hidden default SKU when the product is saved without `variants[]`.
+ * Hide it when the category has attributes — a real card would have values.
+ */
+export function isHiddenDefaultVariant(
+  row: unknown,
+  categoryAttributeCount: number
+): boolean {
+  if (categoryAttributeCount <= 0) return false;
+  return extractVariantAttributeValueIds(row).length === 0;
+}
+
 export function toShopVariantPayloadList(rows: unknown): ShopVariantPayloadRow[] {
   if (!Array.isArray(rows)) return [];
   return rows
@@ -229,12 +336,12 @@ export function responseIncludesVariants(body: unknown): boolean {
   return Array.isArray(product?.variants);
 }
 
-/** Product can be added to the cart only when at least one variant is linked to a shop. */
+/** Cart works only when every saved variant has a shop link — not just the first row. */
 export function savedProductHasShopLink(body: unknown): boolean {
   const product = unwrapProduct(body);
   const variants = product?.variants;
   if (!Array.isArray(variants) || variants.length === 0) return false;
-  return variants.some((v) => shopLinksOfVariant(v).length > 0);
+  return variants.every((v) => shopLinksOfVariant(v).length > 0);
 }
 
 /**

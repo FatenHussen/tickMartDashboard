@@ -23,14 +23,18 @@ function optionalNonNegInt() {
   }, zod.number().int().min(0).optional());
 }
 
-/** Discount is optional integer 0–100 (percentage and fixed). Empty is omitted — never required. */
-function optionalDiscountInt() {
+/**
+ * Discount is optional and never required.
+ * `percentage`: 0–100 with decimals (10.5). Cap is enforced in superRefine.
+ * `fixed`: USD amount with decimals, may exceed 100 (150.75).
+ */
+function optionalDiscountNumber() {
   return zod.preprocess((v) => {
     if (v === '' || v === null || v === undefined) return undefined;
     const n = typeof v === 'number' ? v : Number(v);
     if (!Number.isFinite(n)) return undefined;
-    return Math.min(100, Math.max(0, Math.floor(n)));
-  }, zod.number().int().min(0).max(100).optional());
+    return Math.round(Math.max(0, n) * 100) / 100;
+  }, zod.number().min(0).optional());
 }
 
 // ----------------------------------------------------------------------
@@ -43,10 +47,12 @@ export const ProductSchema = zod
     vendor_scope: zod.enum(['internal', 'external']),
     vendor_id: zod.coerce.number().min(0).optional(),
     /**
-     * `platform` = site (default); hide shops/vendor and omit shop_variants.
-     * `shop` = must link at least one branch via shop_variants.
+     * `platform` = site (default); omit vendor_id / shop_id / shop_variants.
+     * `shop` = send shop_id once, or the vendor (backend binds that vendor's shop).
      */
     sale_channel: zod.enum(['platform', 'shop']).default('platform'),
+    /** Single shop for shop-channel products. `0` = not selected. */
+    shop_id: zod.coerce.number().min(0).optional().default(0),
     name: zod.object({
       en: zod.string().min(1, { message: t('product.nameEnRequired') }),
       ar: zod.string().min(1, { message: t('product.nameArRequired') }),
@@ -69,7 +75,7 @@ export const ProductSchema = zod
     price: optionalNonNegNumber(t('product.pricePositive')),
     /** UI + API: SYP sale amount when USD `price` is empty. */
     price_syp: optionalNonNegNumber(),
-    discount: optionalDiscountInt(),
+    discount: optionalDiscountNumber(),
     discount_type: zod.enum(['none', 'percentage', 'fixed']).default('none'),
     cost_price: optionalNonNegNumber(),
     cost_price_syp: optionalNonNegNumber(),
@@ -162,7 +168,7 @@ export const ProductSchema = zod
           price: optionalNonNegNumber(t('product.pricePositive')),
           price_syp: optionalNonNegNumber(),
           quantity: optionalNonNegInt(),
-          discount: optionalDiscountInt(),
+          discount: optionalDiscountNumber(),
           discount_type: zod.enum(['none', 'percentage', 'fixed']).optional().default('none'),
           max_purchase_quantity: optionalNonNegNumber(),
           is_trend: zod.coerce.number().min(0).max(1).optional().default(0),
@@ -250,6 +256,7 @@ export const ProductSchema = zod
       zod.array(zod.number()).optional()
     ),
 
+    /** Optional cost-only rows. Not required — backend binds every SKU to the shop. */
     shop_variants: zod
       .array(
         zod.object({
@@ -269,16 +276,14 @@ export const ProductSchema = zod
   })
   .superRefine((data, ctx) => {
     const isShopChannel = data.sale_channel === 'shop' || data.is_restaurant === true;
-    // Vendor is optional (filter only). Branch via shop_variants is required for shop channel.
     if (isShopChannel) {
-      const links = (data.shop_variants ?? []).filter(
-        (sv) => sv != null && Number(sv.shop_id) > 0
-      );
-      if (links.length === 0) {
+      const hasShop = Number(data.shop_id) > 0;
+      const hasVendor = Number(data.vendor_id) > 0;
+      if (!hasShop && !hasVendor) {
         ctx.addIssue({
           code: zod.ZodIssueCode.custom,
           message: t('product.shopRequiredForShopChannel'),
-          path: ['shop_variants'],
+          path: ['shop_id'],
         });
       }
     }

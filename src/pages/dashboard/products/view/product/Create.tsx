@@ -48,28 +48,28 @@ import {
 import {
   sortedComboKey,
   resolveAttributeValuesByIds,
+  mergeVariantAttributeValueIds,
+  toCategoryAttributePickerRows,
+  ensureCategoryAttributesFromVariants,
 } from '@/pages/dashboard/products/utils/variant-combinations';
 import {
   useCreateProduct,
   useUpdateProduct,
   useFetchProductById,
 } from '@/pages/dashboard/products/hooks/product';
-import {
-  useUpdateProductVariant,
-  useUpdateShopProductVariant,
-} from '@/pages/dashboard/products/hooks/product-variant';
+import { useUpdateProductVariant } from '@/pages/dashboard/products/hooks/product-variant';
 import {
   VariantGeneratorPanel,
   type GeneratedVariantRow,
 } from '@/pages/dashboard/products/components/VariantGeneratorPanel';
 import {
   toVariantPayload,
-  toShopVariantPayload,
-  savedProductHasShopLink,
-  responseIncludesVariants,
+  isHiddenDefaultVariant,
   variantImageFieldsFromRow,
   variantExistingImageFormState,
+  extractVariantAttributeValueIds,
 } from '@/pages/dashboard/products/utils/variant-payload';
+import { parseOptionalDiscount } from '@/pages/dashboard/products/components/variant-field-helpers';
 
 import { paths } from 'src/routes/paths';
 
@@ -78,8 +78,6 @@ import { Label } from 'src/shared/components/label';
 import { Box, Tab, Tabs, Button, Typography } from 'src/shared/ui';
 import { CreateFormLayout } from 'src/shared/components/forms/create-form-layout';
 import { RHFInfiniteSelect } from 'src/shared/components/hook-form/rhf-infinite-select';
-
-import { ProductShopVariantsSection } from './ProductShopVariantsSection';
 
 // ----------------------------------------------------------------------
 
@@ -128,13 +126,6 @@ function isSyriaSaleCountry(item: { name?: string | null; icon?: string | null }
     name.includes('سوريا') ||
     name.includes('سوریة')
   );
-}
-
-function isDeepDirty(value: unknown): boolean {
-  if (value === true) return true;
-  if (!value || typeof value !== 'object') return false;
-  if (Array.isArray(value)) return value.some((item) => isDeepDirty(item));
-  return Object.values(value as Record<string, unknown>).some((item) => isDeepDirty(item));
 }
 
 function generateRandomSku(): string {
@@ -274,8 +265,7 @@ function currencyMapAmount(
 }
 
 /**
- * Send USD when known (after local sync both fields are usually filled); otherwise SYP
- * for server-side conversion. Never send both — API prefers USD and ignores SYP.
+ * Send both amounts when filled. If both arrive, the API uses USD.
  */
 function resolveUsdOrSyp(
   usd: number | null | undefined,
@@ -285,7 +275,7 @@ function resolveUsdOrSyp(
   const hasSyp = syp != null && !Number.isNaN(Number(syp));
   return {
     usd: hasUsd ? Number(usd) : undefined,
-    syp: !hasUsd && hasSyp ? Number(syp) : undefined,
+    syp: hasSyp ? Number(syp) : undefined,
   };
 }
 
@@ -358,32 +348,8 @@ function filterFileList(v: unknown): File[] {
   return v.filter((x): x is File => x instanceof File);
 }
 
-/** Sorted attribute-value ids for matching a created variant back to a form variant row. */
-function extractVariantAttributeValueIds(variant: any): number[] {
-  if (!variant || typeof variant !== 'object') return [];
-  const directIds = (variant as { attributes_values_ids?: unknown }).attributes_values_ids;
-  if (Array.isArray(directIds)) {
-    return directIds
-      .map((x) => Number(x))
-      .filter((n) => Number.isFinite(n) && n > 0)
-      .sort((a, b) => a - b);
-  }
-  const attrs = (variant as { attributes?: unknown }).attributes;
-  if (Array.isArray(attrs)) {
-    return attrs
-      .map((a: any) => Number(a?.id ?? a?.attribute_value_id ?? a?.value_id))
-      .filter((n) => Number.isFinite(n) && n > 0)
-      .sort((a, b) => a - b);
-  }
-  return [];
-}
-
-/** Created shop variants live under `shop_variants` (new API) or `shops` (legacy detail shape). */
-function extractCreatedShopVariants(variant: any): any[] {
-  if (!variant || typeof variant !== 'object') return [];
-  if (Array.isArray(variant.shop_variants)) return variant.shop_variants;
-  if (Array.isArray(variant.shops)) return variant.shops;
-  return [];
+function sortedAttributeValueIds(variant: unknown): number[] {
+  return [...extractVariantAttributeValueIds(variant)].sort((a, b) => a - b);
 }
 
 function getShopIdFromCreatedShopVariant(csv: any): number {
@@ -392,6 +358,24 @@ function getShopIdFromCreatedShopVariant(csv: any): number {
   if (Number.isFinite(fromShop) && fromShop > 0) return fromShop;
   const direct = Number(csv?.shop_id);
   return Number.isFinite(direct) && direct > 0 ? direct : 0;
+}
+
+/** First shop id on the product (GET `shop_id` / `shop.id` / first variant shop link). */
+function extractProductShopId(product: ProductDetailData | null | undefined): number {
+  if (!product) return 0;
+  const direct = Number(product.shop_id ?? product.shop?.id);
+  if (Number.isFinite(direct) && direct > 0) return direct;
+  for (const variant of product.variants ?? []) {
+    const links =
+      variant.shops ??
+      ((variant as { shop_variants?: Array<{ shop_id?: number; shop?: { id?: number } }> })
+        .shop_variants ?? []);
+    for (const link of links) {
+      const id = getShopIdFromCreatedShopVariant(link);
+      if (id > 0) return id;
+    }
+  }
+  return 0;
 }
 
 /**
@@ -636,121 +620,6 @@ function RemovableLocalImageThumb({
   );
 }
 
-/** API returns `attribute` in one locale (often AR); category `name` may be {en, ar} — match any. */
-function categoryAttrLabelMatches(attr: any, apiAttributeLabel: string): boolean {
-  const api = String(apiAttributeLabel ?? '').trim().toLowerCase();
-  if (!api) return false;
-  if (typeof attr?.name === 'object' && attr.name) {
-    const en = String(attr.name.en ?? '').trim().toLowerCase();
-    const ar = String(attr.name.ar ?? '').trim().toLowerCase();
-    if (api === en || api === ar) return true;
-  }
-  return api === String(attr?.name ?? '').trim().toLowerCase();
-}
-
-function normalizeHexForCompare(s: string) {
-  const t = String(s).trim();
-  return /^#[0-9a-fA-F]{3,8}$/.test(t) ? t.toLowerCase() : t;
-}
-
-/** Resolve category attribute value id from API string (value or hex color, any locale). */
-function findAttributeValueId(attr: any, rawVal: string): number | undefined {
-  const vals = attr?.values ?? [];
-  const target = String(rawVal ?? '').trim();
-  const targetNorm = normalizeHexForCompare(target);
-  const targetIsHex = /^#[0-9a-fA-F]{3,8}$/.test(target);
-
-  for (const x of vals) {
-    const candidates: string[] = [];
-    if (typeof x?.value === 'string') candidates.push(x.value);
-    else if (x?.value && typeof x.value === 'object') {
-      if (x.value.en != null) candidates.push(String(x.value.en));
-      if (x.value.ar != null) candidates.push(String(x.value.ar));
-    }
-    if (typeof x?.name === 'string') candidates.push(x.name);
-    else if (x?.name && typeof x.name === 'object') {
-      if (x.name.en != null) candidates.push(String(x.name.en));
-      if (x.name.ar != null) candidates.push(String(x.name.ar));
-    }
-    for (const c of candidates) {
-      const cTrim = String(c).trim();
-      if (targetIsHex && /^#[0-9a-fA-F]{3,8}$/.test(cTrim)) {
-        if (normalizeHexForCompare(cTrim) === targetNorm && x.id != null) return Number(x.id);
-      } else if (cTrim.toLowerCase() === target.toLowerCase() && x.id != null) {
-        return Number(x.id);
-      }
-    }
-  }
-  return undefined;
-}
-
-/**
- * Build `attributes_values_ids` from the variant's own `attributes` rows (one value per attribute type).
- * Prefers `value_id` (or `id`) on each attribute row — the same field the API returns and Details.tsx uses.
- * Falls back to string-label matching against categoryAttributes only when those direct IDs are absent.
- */
-function resolveVariantAttributeValueIds(
-  v: { attributes?: Array<{ attribute: string; value: string }> },
-  categoryAttrs: any[]
-): number[] {
-  const attrs = (v.attributes ?? []) as any[];
-
-  // Fast path: every row already has a resolved value ID — use them directly.
-  const directIds = attrs
-    .map((a: any) => {
-      const vid = a.value_id ?? a.id;
-      return vid != null && !Number.isNaN(Number(vid)) ? Number(vid) : null;
-    })
-    .filter((id): id is number => id !== null);
-
-  if (directIds.length > 0 && directIds.length === attrs.length) {
-    return [...new Set(directIds)];
-  }
-
-  // Slow path: string-label matching (fallback for rows without value_id).
-  // Last row wins per attribute label (API sometimes repeats the same attribute many times).
-  const lastRowByLabel = new Map<string, any>();
-  for (const row of attrs) {
-    const rawLabel = (row as any).attribute;
-    const label =
-      typeof rawLabel === 'object' && rawLabel !== null
-        ? String(rawLabel.en ?? rawLabel.ar ?? '').trim()
-        : String(rawLabel ?? '').trim();
-    if (!label) continue;
-    lastRowByLabel.set(label.toLowerCase(), row);
-  }
-
-  const ids: number[] = [];
-  for (const row of lastRowByLabel.values()) {
-    // Direct ID available on this row — use it.
-    const vid = (row as any).value_id ?? null;
-    if (vid != null && !Number.isNaN(Number(vid))) {
-      ids.push(Number(vid));
-      continue;
-    }
-
-    const rawLabel = (row as any).attribute;
-    const label =
-      typeof rawLabel === 'object' && rawLabel !== null
-        ? String(rawLabel.en ?? rawLabel.ar ?? '').trim()
-        : String(rawLabel ?? '').trim();
-    const attr = categoryAttrs.find((ca: any) => categoryAttrLabelMatches(ca, label));
-    if (!attr) continue;
-
-    const rawValSrc = (row as any).value;
-    const rawVal =
-      typeof rawValSrc === 'object' && rawValSrc !== null
-        ? String(rawValSrc.en ?? rawValSrc.ar ?? '').trim()
-        : String(rawValSrc ?? '').trim();
-    const idFound = findAttributeValueId(attr, rawVal);
-    if (idFound != null && !Number.isNaN(idFound)) {
-      ids.push(idFound);
-    }
-  }
-
-  return ids;
-}
-
 function normalizeProductExtraLang(v: unknown): { en: string; ar: string } {
   if (typeof v === 'string') return { en: v.trim(), ar: v.trim() };
   if (v && typeof v === 'object') {
@@ -881,7 +750,6 @@ export default function CreatePage() {
   const createProductMutation = useCreateProduct();
   const updateProductMutation = useUpdateProduct();
   const updateVariantMutation = useUpdateProductVariant();
-  const updateShopVariantMutation = useUpdateShopProductVariant();
 
   const todayDateInputMin = useMemo(() => toDateInputLocalYMD(new Date()), []);
 
@@ -891,6 +759,7 @@ export default function CreatePage() {
     vendor_scope: 'internal',
     vendor_id: INTERNAL_VENDOR_ID,
     sale_channel: 'platform',
+    shop_id: 0,
     name: { en: '', ar: '' },
     description: { en: '', ar: '' },
     full_description: { en: '', ar: '' },
@@ -1081,6 +950,7 @@ export default function CreatePage() {
     setValue('category_id', 0);
     setValue('variants', []);
     setValue('shop_variants', []);
+    setValue('shop_id', 0);
     restaurantShopMetaRef.current.clear();
     if (isRestaurantToggle) {
       setValue('sale_channel', 'shop');
@@ -1095,7 +965,7 @@ export default function CreatePage() {
 
   const existingMediaIds = watch('existing_media_ids') ?? [];
   const watchedVariants = watch('variants') || [];
-  const watchedShopVariants = watch('shop_variants') || [];
+  const watchedShopId = Number(watch('shop_id') || 0);
   const watchedProductSku = watch('sku') ?? '';
   const existingVariantComboKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -1113,65 +983,60 @@ export default function CreatePage() {
   const isShopSaleChannel =
     saleChannelWatch === 'shop' || isRestaurantToggle === true;
   const sypRate = sypCurrency ? parseCurrencyRate(sypCurrency) : null;
-  /** Optional vendor filter for shop-channel branch list (0 = all vendors). */
+  /** Optional vendor filter for the single-shop picker (0 = all vendors). */
   const shopVendorFilterId = Number(watchedVendorId) || 0;
   const { data: shopsResponse } = useFetchShops(1, 100, {
     vendorId: shopVendorFilterId > 0 ? shopVendorFilterId : undefined,
-    enabled: isShopSaleChannel,
+    enabled: isShopSaleChannel && !isRestaurantToggle,
   });
   const shops = (shopsResponse as any)?.data?.items ?? [];
 
-  /** When the vendor filter changes, clear shop rows (list is per-vendor). */
+  /** When the vendor filter changes, drop the previous shop (one shop per vendor). */
   const skipInitialVendorFilterEffect = useRef(true);
   useEffect(() => {
-    if (!isShopSaleChannel) return;
+    if (!isShopSaleChannel || isRestaurantToggle) return;
     if (skipInitialVendorFilterEffect.current) {
       skipInitialVendorFilterEffect.current = false;
       return;
     }
+    setValue('shop_id', 0);
     setValue('shop_variants', []);
-  }, [watchedVendorId, isShopSaleChannel, setValue]);
+  }, [watchedVendorId, isShopSaleChannel, isRestaurantToggle, setValue]);
 
-  /** Restaurant products are always branch-linked. */
+  useEffect(() => {
+    if (!isShopSaleChannel || isRestaurantToggle || shopVendorFilterId <= 0) return;
+    if (shops.length !== 1) return;
+    const onlyShopId = Number(shops[0]?.id);
+    if (onlyShopId > 0 && watchedShopId !== onlyShopId) {
+      setValue('shop_id', onlyShopId, { shouldDirty: false });
+    }
+  }, [
+    isShopSaleChannel,
+    isRestaurantToggle,
+    shopVendorFilterId,
+    shops,
+    watchedShopId,
+    setValue,
+  ]);
+
+  /** Restaurant products always use the shop channel. */
   useEffect(() => {
     if (isRestaurantToggle) {
       setValue('sale_channel', 'shop', { shouldDirty: false });
     }
   }, [isRestaurantToggle, setValue]);
 
-  const selectedRestaurantShopId = useMemo(() => {
-    if (!isRestaurantToggle || !categoryId || categoryId <= 0) return 0;
-    const row = watchedShopVariants.find((sv) => Number(sv.variant_index) === 0);
-    return Number(row?.shop_id) > 0 ? Number(row!.shop_id) : 0;
-  }, [isRestaurantToggle, categoryId, watchedShopVariants]);
+  const selectedRestaurantShopId =
+    isRestaurantToggle && categoryId > 0 ? watchedShopId : 0;
 
   const selectedRestaurantShopInitialLabel = useMemo(() => {
     if (selectedRestaurantShopId <= 0) return undefined;
-    for (const v of productResponse?.variants ?? []) {
-      for (const s of v.shops ?? []) {
-        if (Number(s.shop_id) === selectedRestaurantShopId) {
-          return typeof s.shop_name === 'string' ? s.shop_name : formatTranslated(s.shop_name as any);
-        }
-      }
+    const shopName = productResponse?.shop?.name;
+    if (shopName != null) {
+      return typeof shopName === 'string' ? shopName : formatTranslated(shopName as any);
     }
     return undefined;
-  }, [selectedRestaurantShopId, productResponse?.variants]);
-
-  /**
-   * Warn only for shop-channel products missing branch links. Platform products are
-   * auto-linked on the backend — never show this for `sale_channel=platform`.
-   */
-  const productMissingShopLink = useMemo(() => {
-    if (!isEditMode || !productResponse) return false;
-    const channel = productResponse.sale_channel ?? 'platform';
-    if (channel !== 'shop' && !productResponse.is_restaurant) return false;
-    const vars = productResponse.variants ?? [];
-    if (vars.length === 0) return true;
-    return !vars.some((v) => {
-      const links = v.shops ?? (v as { shop_variants?: unknown[] }).shop_variants ?? [];
-      return Array.isArray(links) && links.length > 0;
-    });
-  }, [isEditMode, productResponse]);
+  }, [selectedRestaurantShopId, productResponse?.shop?.name]);
 
   const restaurantShopFetcher = useCallback(
     (page: number, limit: number) => {
@@ -1202,28 +1067,38 @@ export default function CreatePage() {
     [categoryId]
   );
 
+  const shopFetcher = useCallback(
+    (page: number, limit: number) =>
+      _ShopApi
+        .getListShop({
+          page,
+          per_page: limit,
+          ...(shopVendorFilterId > 0 ? { vendor_id: shopVendorFilterId } : {}),
+          shop_type: 'store',
+        })
+        .then((r) => ({
+          data: {
+            items: r.data.items.map((shop) => ({
+              id: shop.id,
+              label: formatTranslated(shop.name as any),
+            })),
+            pagination: r.data.pagination,
+          },
+        })),
+    [shopVendorFilterId]
+  );
+
   const handleRestaurantShopSelect = useCallback(
     (shopId: number) => {
-      if (shopId <= 0) {
-        setValue('shop_variants', []);
-        return;
-      }
+      setValue('shop_id', shopId > 0 ? shopId : 0, { shouldDirty: true });
+      setValue('shop_variants', []);
+      if (shopId <= 0) return;
       const meta = restaurantShopMetaRef.current.get(shopId);
       const vendorId = meta?.vendorId ?? 0;
       setValue('vendor_scope', 'external');
-      if (vendorId > 0)       setValue('vendor_id', vendorId);
-
-      const existing = getValues('shop_variants') ?? [];
-      const idx = existing.findIndex((sv) => Number(sv.variant_index) === 0);
-      if (idx >= 0) {
-        const next = [...existing];
-        next[idx] = { ...next[idx], shop_id: shopId };
-        setValue('shop_variants', next);
-      } else {
-        setValue('shop_variants', [...existing, { shop_id: shopId, variant_index: 0 }]);
-      }
+      if (vendorId > 0) setValue('vendor_id', vendorId);
     },
-    [getValues, setValue]
+    [setValue]
   );
 
   /** Root category changed (not the initial edit-mode hydration) — its attributes no longer match existing variants. */
@@ -1241,6 +1116,7 @@ export default function CreatePage() {
     if (prev !== null && prev !== 0 && prev !== categoryId) {
       setValue('category_details', []);
       if (isRestaurantToggle) {
+        setValue('shop_id', 0);
         setValue('shop_variants', []);
         setValue('vendor_id', 0);
         restaurantShopMetaRef.current.clear();
@@ -1266,10 +1142,19 @@ export default function CreatePage() {
       },
       { requireCategoryId: true }
     );
-  const categoryAttributes =
-    (categoryAttributesAll?.data as { items?: unknown[]; data?: unknown[] } | undefined)?.items ??
-    (categoryAttributesAll?.data as { data?: unknown[] } | undefined)?.data ??
-    [];
+  const categoryAttributes = useMemo(
+    () =>
+      ensureCategoryAttributesFromVariants(
+        toCategoryAttributePickerRows(
+          (categoryAttributesAll?.data as { items?: unknown[]; data?: unknown[] } | undefined)
+            ?.items ??
+            (categoryAttributesAll?.data as { data?: unknown[] } | undefined)?.data ??
+            []
+        ),
+        productResponse?.variants ?? []
+      ),
+    [categoryAttributesAll, productResponse?.variants]
+  );
 
   const { data: originCountriesRaw } = useQuery({
     queryKey: ['countries', 'all', 'product-origin'],
@@ -1416,25 +1301,18 @@ export default function CreatePage() {
     useFieldArray({ control, name: 'category_details' });
   const watchedCategoryDetailRows = useWatch({ control, name: 'category_details' }) ?? [];
   const watchedExtraDetailsRows = useWatch({ control, name: 'extra_details' }) ?? [];
-  const { fields: shopVariantsFields, append: appendShopVariant, remove: removeShopVariant } =
-    useFieldArray({ control, name: 'shop_variants' });
+  const appendVariantWithShopLinks = useCallback(
+    (row: GeneratedVariantRow) => {
+      appendVariant(row);
+    },
+    [appendVariant]
+  );
 
   const handleRemoveVariant = useCallback(
     (variantIndex: number) => {
-      const sv = getValues('shop_variants') ?? [];
-      const nextSv = sv
-        .filter((row) => Number(row?.variant_index) !== variantIndex)
-        .map((row) => ({
-          ...row,
-          variant_index:
-            Number(row?.variant_index) > variantIndex
-              ? Number(row.variant_index) - 1
-              : Number(row?.variant_index),
-        }));
-      setValue('shop_variants', nextSv, { shouldDirty: true });
       removeVariant(variantIndex);
     },
-    [getValues, setValue, removeVariant]
+    [removeVariant]
   );
 
   /**
@@ -1506,6 +1384,7 @@ export default function CreatePage() {
       } = args;
       const allVariants = getValues('variants') ?? [];
       const apiVariantsPayload: NonNullable<ProductCreateUpdatePayload['variants']> = [];
+      const remap = new Map<number, number>();
       allVariants.forEach((row, idx) => {
         if (idx === variantIndex) {
           const cleaned = toVariantPayload({
@@ -1520,13 +1399,20 @@ export default function CreatePage() {
             quantity,
             discount_type,
             discount,
+            is_active: Number((row as { is_active?: number }).is_active) === 0 ? 0 : 1,
           });
-          if (cleaned) apiVariantsPayload.push(cleaned);
+          if (cleaned) {
+            remap.set(idx, apiVariantsPayload.length);
+            apiVariantsPayload.push(cleaned);
+          }
         } else if (row?.id) {
           // Full whitelist for existing rows: a replace without price/quantity/images
           // would reset those fields to product defaults / delete media.
           const cleaned = toVariantPayload(row as Record<string, unknown>, { omitImages: true });
-          if (cleaned) apiVariantsPayload.push(cleaned);
+          if (cleaned) {
+            remap.set(idx, apiVariantsPayload.length);
+            apiVariantsPayload.push(cleaned);
+          }
         }
       });
       const resp = await _ProductApi.updateProductVariantsOnly(productId, {
@@ -1537,110 +1423,13 @@ export default function CreatePage() {
         : [];
       const sortedTarget = [...attrIds].sort((a, b) => a - b);
       const match = updatedVariants.find((cv) => {
-        const cvIds = extractVariantAttributeValueIds(cv);
+        const cvIds = sortedAttributeValueIds(cv);
         if (cvIds.length !== sortedTarget.length) return false;
         return cvIds.every((vid, i) => vid === sortedTarget[i]);
       });
       return match?.id ? Number(match.id) : 0;
     },
     [getValues]
-  );
-
-  /**
-   * Add ONE new shop variant to an existing product/variant pair without disturbing other rows.
-   * Returns the newly-created shop_variant id (or 0 if not matched in response).
-   */
-  const createSingleShopVariantOnProduct = useCallback(
-    async (args: {
-      productId: number | string;
-      parentVariantId: number;
-      parentVariantIndex: number;
-      shopId: number;
-      costPrice: number | undefined;
-    }): Promise<number> => {
-      const { productId, parentVariantId, parentVariantIndex, shopId, costPrice } = args;
-      const allVariants = getValues('variants') ?? [];
-      const allShopVariants = getValues('shop_variants') ?? [];
-
-      // Map original variant index -> remapped index in the payload (we send only variants with id).
-      const variantsPayload: NonNullable<ProductCreateUpdatePayload['variants']> = [];
-      const remap = new Map<number, number>();
-      allVariants.forEach((row, idx) => {
-        if (row?.id) {
-          remap.set(idx, variantsPayload.length);
-          const cleaned = toVariantPayload(row as Record<string, unknown>, { omitImages: true });
-          if (cleaned) variantsPayload.push(cleaned);
-        }
-      });
-
-      const shopVariantsPayload: NonNullable<ProductCreateUpdatePayload['shop_variants']> = [];
-      // shop_variants is a full replace: send the complete kept list (not only the new row).
-      allShopVariants.forEach((sv) => {
-        if (!sv?.id) return;
-        const remappedIdx = remap.get(Number(sv.variant_index));
-        if (remappedIdx == null) return;
-        const cleaned = toShopVariantPayload({ ...sv, variant_index: remappedIdx });
-        if (cleaned) shopVariantsPayload.push(cleaned);
-      });
-      const parentRemapped = remap.get(parentVariantIndex);
-      if (parentRemapped == null) {
-        return 0;
-      }
-      const newShopRow = toShopVariantPayload({
-        shop_id: shopId,
-        variant_index: parentRemapped,
-        cost_price: costPrice,
-      });
-      if (newShopRow) shopVariantsPayload.push(newShopRow);
-
-      const resp = await _ProductApi.updateProductVariantsOnly(productId, {
-        variants: variantsPayload,
-        shop_variants: shopVariantsPayload,
-      });
-      const updatedVariants: any[] = Array.isArray(resp?.data?.variants)
-        ? resp.data.variants
-        : [];
-      // The backend wipes and recreates EVERY shop-variant row of the variants it receives
-      // (ProductService::syncVariantsAndShopLinks), so the `id`s the other rows still hold in
-      // form state are dead the moment this call returns. Re-sync them all from the response,
-      // keyed by (parent variant id, shop id) — otherwise the per-row save/delete buttons hit
-      // shop-product-variants/{staleId}.
-      const freshShopVariantIds = new Map<string, number>();
-      updatedVariants.forEach((uv) => {
-        const uvId = Number(uv?.id);
-        if (!uvId) return;
-        extractCreatedShopVariants(uv).forEach((csv) => {
-          const csvShopId = getShopIdFromCreatedShopVariant(csv);
-          const csvId = Number(csv?.id);
-          if (csvShopId > 0 && csvId > 0) {
-            freshShopVariantIds.set(`${uvId}:${csvShopId}`, csvId);
-          }
-        });
-      });
-      if (freshShopVariantIds.size > 0) {
-        const variantRowsAfterSave = getValues('variants') ?? [];
-        const currentShopVariants = getValues('shop_variants') ?? [];
-        let anyIdChanged = false;
-        const resyncedShopVariants = currentShopVariants.map((sv) => {
-          const parentId = Number(variantRowsAfterSave[Number(sv?.variant_index)]?.id ?? 0);
-          const svShopId = Number(sv?.shop_id);
-          if (!parentId || !svShopId) return sv;
-          const fresh = freshShopVariantIds.get(`${parentId}:${svShopId}`);
-          if (!fresh || fresh === Number(sv?.id)) return sv;
-          anyIdChanged = true;
-          return { ...sv, id: fresh };
-        });
-        if (anyIdChanged) {
-          setValue('shop_variants', resyncedShopVariants, { shouldDirty: false });
-        }
-      }
-      const parentRow = updatedVariants.find((v) => Number(v?.id) === Number(parentVariantId));
-      const created = extractCreatedShopVariants(parentRow).find(
-        (csv) => getShopIdFromCreatedShopVariant(csv) === shopId
-      );
-      return created?.id ? Number(created.id) : 0;
-    },
-    [getValues, setValue]
   );
 
   // Populate form in edit mode
@@ -1657,6 +1446,7 @@ export default function CreatePage() {
           Number(p.vendor?.id) === INTERNAL_VENDOR_ID ? 'internal' : 'external',
         vendor_id: Number(p.vendor?.id) || 0,
         sale_channel: p.sale_channel === 'shop' || p.is_restaurant ? 'shop' : 'platform',
+        shop_id: extractProductShopId(p),
         name: { en: p.name?.en ?? '', ar: p.name?.ar ?? '' },
         description: { en: p.description?.en ?? '', ar: p.description?.ar ?? '' },
         full_description: { en: p.full_description?.en ?? '', ar: p.full_description?.ar ?? '' },
@@ -1686,10 +1476,7 @@ export default function CreatePage() {
           (p.price != null && !Number.isNaN(Number(p.price)) && sypCurrency
             ? usdToLocalAmount(Number(p.price), parseCurrencyRate(sypCurrency))
             : undefined),
-        discount:
-          p.discount != null && String(p.discount).trim() !== ''
-            ? Math.min(100, Math.max(0, Math.floor(Number(p.discount))))
-            : undefined,
+        discount: parseOptionalDiscount(p.discount),
         discount_type: (p.discount_type as 'none' | 'percentage' | 'fixed') || 'none',
         cost_price: p.cost_price != null ? Number(p.cost_price) : undefined,
         cost_price_syp:
@@ -1731,7 +1518,7 @@ export default function CreatePage() {
             const imageState = variantExistingImageFormState(v.images);
             return {
             id: v.id,
-            attributes_values_ids: [],
+            attributes_values_ids: extractVariantAttributeValueIds(v),
             images: [],
             existing_images_ids: imageState.existing_images_ids,
             existing_images: imageState.existing_images,
@@ -1751,10 +1538,7 @@ export default function CreatePage() {
                 ? usdToLocalAmount(Number((v as any).price), parseCurrencyRate(sypCurrency))
                 : undefined),
             quantity: (v as any).quantity != null ? Number((v as any).quantity) : undefined,
-            discount:
-              (v as any).discount != null
-                ? Math.min(100, Math.max(0, Math.floor(Number((v as any).discount))))
-                : undefined,
+            discount: parseOptionalDiscount((v as any).discount),
             discount_type:
               ((v as any).discount_type as 'none' | 'percentage' | 'fixed' | undefined) ?? 'none',
             max_purchase_quantity: (v as any).max_purchase_quantity != null ? Number((v as any).max_purchase_quantity) : undefined,
@@ -1782,19 +1566,7 @@ export default function CreatePage() {
           .map((v: any) => (typeof v === 'object' && v?.id != null ? v.id : v))
           .filter((v) => v != null && v !== '' && !Number.isNaN(Number(v)))
           .map((v) => Number(v)),
-        shop_variants:
-          p.variants?.flatMap((v, vIndex) => {
-            const shopLinks =
-              Array.isArray(v.shops) && v.shops.length > 0
-                ? v.shops
-                : ((v as { shop_variants?: unknown[] }).shop_variants ?? []);
-            return shopLinks.map((s: any) => ({
-              id: s.id != null ? Number(s.id) : undefined,
-              shop_id: Number(s.shop_id ?? s.shop?.id),
-              variant_index: vIndex,
-              cost_price: s.cost_price != null ? Number(s.cost_price) : undefined,
-            }));
-          }) ?? [],
+        shop_variants: [],
         badges: p.badges?.length
           ? p.badges.map((b: any) => (typeof b === 'number' ? b : b.id))
           : [],
@@ -1934,27 +1706,41 @@ export default function CreatePage() {
 
   const variantsFixedRef = useRef<string | null>(null);
 
-  // Map variant.attributes to attributes_values_ids when categoryAttributes loads (match by attr name + value)
+  // Keep GET IDs on every row. Fill a missing size/color from `attributes[]`.
   useEffect(() => {
-    if (
-      !isEditMode ||
-      !productResponse?.variants?.length ||
-      !categoryAttributes.length ||
-      !id
-    )
-      return;
+    if (!isEditMode || !productResponse?.variants?.length || !id) return;
     if (variantsFixedRef.current === id) return;
     const p = productResponse;
+    const apiVariants = restaurantMode
+      ? p.variants!
+      : p.variants!.filter((v) => !isHiddenDefaultVariant(v, categoryAttributes.length));
     const currentVariants = getValues('variants') ?? [];
-    const mappedVariants = p.variants!.map((v) => {
-      const ids = resolveVariantAttributeValueIds(v, categoryAttributes);
+    if (currentVariants.length === 0 && apiVariants.length === 0) return;
+    const alreadyHydrated =
+      currentVariants.length === apiVariants.length &&
+      currentVariants.every((row, i) => {
+        const apiRow = apiVariants[i];
+        const merged = mergeVariantAttributeValueIds(
+          extractVariantAttributeValueIds(row),
+          extractVariantAttributeValueIds(apiRow),
+          categoryAttributes,
+          apiRow.attributes
+        );
+        const formIds = extractVariantAttributeValueIds(row);
+        return merged.length === formIds.length && merged.every((valueId) => formIds.includes(valueId));
+      });
+    if (alreadyHydrated) {
+      variantsFixedRef.current = id;
+      return;
+    }
+    const mappedVariants = apiVariants.map((v) => {
       const prev = currentVariants.find((c: any) => Number(c?.id) === Number(v.id));
+      const fromPrev = extractVariantAttributeValueIds(prev);
+      const fromApi = extractVariantAttributeValueIds(v);
+      const ids = mergeVariantAttributeValueIds(fromPrev, fromApi, categoryAttributes, v.attributes);
       const prevFiles = Array.isArray(prev?.images)
         ? (prev!.images as unknown[]).filter((f): f is File => f instanceof File)
         : [];
-      const matchedAttr = (categoryAttributes as any[]).find((a: any) =>
-        (a.values || []).some((val: any) => ids.includes(Number(val.id)))
-      );
       const fromApiImages = variantExistingImageFormState(v.images);
       const prevIds =
         prev && Array.isArray(prev.existing_images_ids)
@@ -1962,7 +1748,6 @@ export default function CreatePage() {
           : fromApiImages.existing_images_ids;
       return {
         id: v.id,
-        category_attribute_id: matchedAttr?.id ?? (prev as any)?.category_attribute_id,
         attributes_values_ids: ids,
         images: prevFiles,
         existing_images_ids: prevIds,
@@ -1990,8 +1775,7 @@ export default function CreatePage() {
           (prev as any)?.quantity ??
           ((v as any).quantity != null ? toOptionalInt((v as any).quantity) : undefined),
         discount:
-          (prev as any)?.discount ??
-          ((v as any).discount != null ? Number((v as any).discount) : undefined),
+          (prev as any)?.discount ?? parseOptionalDiscount((v as any).discount),
         discount_type:
           (prev as any)?.discount_type ??
           ((v as any).discount_type as 'none' | 'percentage' | 'fixed' | undefined) ??
@@ -2005,29 +1789,25 @@ export default function CreatePage() {
           ((v as any).is_active === false || Number((v as any).is_active) === 0 ? 0 : 1),
       };
     });
-    // Only lock the guard if ALL variants got at least one attribute id resolved.
-    // If mapping partially failed, keep the door open to retry when categoryAttributes refreshes.
-    const allMapped = mappedVariants.every((mv) => mv.attributes_values_ids.length > 0);
+    const allMapped = mappedVariants.every((mv, i) => {
+      const apiRow = apiVariants[i];
+      const needed = mergeVariantAttributeValueIds(
+        [],
+        extractVariantAttributeValueIds(apiRow),
+        categoryAttributes,
+        apiRow.attributes
+      );
+      return needed.every((valueId) => mv.attributes_values_ids.includes(valueId));
+    });
     setValue('variants', mappedVariants);
     if (allMapped) {
       variantsFixedRef.current = id;
     }
-  }, [isEditMode, productResponse, categoryAttributes, setValue, id, sypCurrency]);
+  }, [isEditMode, productResponse, categoryAttributes, restaurantMode, setValue, id, sypCurrency, getValues]);
 
   const isSubmitting = createProductMutation.isPending || updateProductMutation.isPending;
   const errorMessage =
     createProductMutation.error?.message || updateProductMutation.error?.message || null;
-
-  // Map product variant.attributes → value IDs (one per attribute type; same rules as resolveVariantAttributeValueIds).
-  const mapVariantsToAttributeIds = (
-    variants: Array<{ id?: number; attributes?: Array<{ attribute: string; value: string }>; images?: File[] }>,
-    attrs: any[]
-  ) =>
-    variants.map((v) => ({
-      id: v.id,
-      attributes_values_ids: resolveVariantAttributeValueIds(v, attrs),
-      images: (v as any).images ?? [],
-    }));
 
   const onSubmit = async (data: ProductFormValues) => {
     try {
@@ -2096,31 +1876,23 @@ export default function CreatePage() {
 
       console.log('[Product Form] Validation passed, submitting:', payload);
 
-      // In edit mode: ensure variants have attributes_values_ids (full payload - changed + unchanged)
+      // Every row must keep numeric IDs from GET / dropdowns — never rebuild from the card label.
       if (isEditMode && productResponse && (payload.variants?.length ?? 0) > 0) {
-        const enrichedFromApi = categoryAttributes.length > 0
-          ? mapVariantsToAttributeIds(
-              productResponse.variants?.map((v) => ({
-                id: v.id,
-                attributes: v.attributes,
-              })) ?? [],
-              categoryAttributes
-            )
-          : [];
         payload = {
           ...payload,
           variants: payload.variants!.map((fv) => {
-            if (fv.attributes_values_ids?.length) {
-              return fv; // User already selected - use form values
-            }
-            const mapped =
+            const apiRow =
               fv.id && productResponse.variants
-                ? enrichedFromApi.find((e) => e.id === fv.id)
-                : null;
+                ? productResponse.variants.find((v) => Number(v.id) === Number(fv.id))
+                : undefined;
             return {
               ...fv,
-              attributes_values_ids:
-                mapped?.attributes_values_ids ?? fv.attributes_values_ids ?? [],
+              attributes_values_ids: mergeVariantAttributeValueIds(
+                extractVariantAttributeValueIds(fv),
+                extractVariantAttributeValueIds(apiRow),
+                categoryAttributes,
+                apiRow?.attributes
+              ),
             };
           }),
         };
@@ -2172,25 +1944,12 @@ export default function CreatePage() {
       const validVariants = validVariantEntries.map(({ row }) => row);
       const validVariantOrigIndices = validVariantEntries.map(({ origIdx }) => origIdx);
 
-      const variantIndexMap = new Map<number, number>();
-      validVariantEntries.forEach(({ origIdx }, nextIdx) => {
-        variantIndexMap.set(origIdx, nextIdx);
-      });
-      const remappedShopVariants = (payload.shop_variants ?? [])
-        .filter((sv) => Number(sv.shop_id) > 0 && variantIndexMap.has(Number(sv.variant_index)))
-        .map((sv) => ({
-          ...sv,
-          variant_index: variantIndexMap.get(Number(sv.variant_index))!,
-        }));
-
       let variantsForPayload = restaurantMode
         ? validVariants.map((v) => ({ ...v, model: '', barcode: '' }))
-        : validVariants;
-      let shopVariantsForPayload = remappedShopVariants;
+        : validVariants.filter((v) => !isHiddenDefaultVariant(v, categoryAttributes.length));
 
-      // Restaurant products have no attribute-based variants. If the shop SKU row
-      // is missing after a branch was selected, send one minimal variant.
-      const hasShopLink = (payload.shop_variants ?? []).some((sv) => Number(sv.shop_id) > 0);
+      const selectedShopId = Number(payload.shop_id ?? getValues('shop_id') ?? 0);
+      const hasShopLink = selectedShopId > 0 || Number(payload.vendor_id) > 0;
       if (restaurantMode && variantsForPayload.length === 0 && hasShopLink) {
         const row0 = rawVariantRows[0] as
           | {
@@ -2230,9 +1989,6 @@ export default function CreatePage() {
             discount_type: 'none' as const,
           },
         ];
-        shopVariantsForPayload = (payload.shop_variants ?? [])
-          .filter((sv) => Number(sv.shop_id) > 0)
-          .map((sv) => ({ ...sv, variant_index: 0 }));
       }
 
       const saleChannel: 'platform' | 'shop' =
@@ -2265,13 +2021,13 @@ export default function CreatePage() {
           payload.discount_type === 'none' ? 0 : (payload.discount ?? 0),
         discount_type: payload.discount_type ?? 'none',
         sale_channel: saleChannel,
-        // Platform: backend sets Tikmool vendor + default branch — omit vendor_id / shop_variants.
         vendor_id:
           saleChannel === 'shop' && payload.vendor_id && payload.vendor_id > 0
             ? payload.vendor_id
             : undefined,
+        shop_id: saleChannel === 'shop' && selectedShopId > 0 ? selectedShopId : undefined,
         variants: variantsForPayload,
-        shop_variants: saleChannel === 'shop' ? shopVariantsForPayload : undefined,
+        shop_variants: undefined,
         category_details: payload.category_details?.filter(
           (cd) => cd.category_detail_id && cd.category_detail_id > 0
         ),
@@ -2305,9 +2061,6 @@ export default function CreatePage() {
           })
         )
       ).filter((row): row is NonNullable<typeof row> => row != null);
-      const shopVariantsCleaned = (finalPayload.shop_variants ?? [])
-        .map((sv) => toShopVariantPayload(sv as Record<string, unknown>))
-        .filter((sv): sv is NonNullable<typeof sv> => sv != null);
       let thumb = finalPayload.thumbnail;
       if (thumb instanceof File) thumb = await compressImage(thumb);
       let seoImg = finalPayload.seo_image;
@@ -2316,7 +2069,7 @@ export default function CreatePage() {
         ...finalPayload,
         images: productImagesCompressed,
         variants: variantsCompressed,
-        shop_variants: shopVariantsCleaned,
+        shop_variants: undefined,
         thumbnail: thumb,
         seo_image: seoImg,
       };
@@ -2338,27 +2091,17 @@ export default function CreatePage() {
           delete p.seo_image;
         }
       };
-      // Never send empty arrays: `[]` wipes all variants / branch links on the backend.
+      // Never send empty arrays: `[]` wipes all variants on the backend.
       const stripEmptyNestedArrays = (p: Record<string, unknown>) => {
         if (!Array.isArray(p.variants) || p.variants.length === 0) delete p.variants;
         if (!Array.isArray(p.shop_variants) || p.shop_variants.length === 0) {
           delete p.shop_variants;
         }
       };
-      const notifySaved = (resp: unknown) => {
+      const notifySaved = (_resp: unknown) => {
         toast.success(
           isEditMode ? t('form.productUpdatedSuccess') : t('form.productCreatedSuccess')
         );
-        // Platform products are auto-linked; only warn when shop channel still has no branch.
-        const channel =
-          (getValues('sale_channel') as string) === 'shop' || restaurantMode ? 'shop' : 'platform';
-        if (
-          channel === 'shop' &&
-          responseIncludesVariants(resp) &&
-          !savedProductHasShopLink(resp)
-        ) {
-          toast.warning(t('form.productSavedWithoutShopLink'));
-        }
       };
 
       if (isEditMode && id) {
@@ -2366,34 +2109,29 @@ export default function CreatePage() {
         stripSeoIfNoFile(editApiPayload);
         stripEmptyNestedArrays(editApiPayload);
 
-        // Edit rules for sale_channel / shop_variants:
-        // - name-only (channel + shops unchanged) → omit both
-        // - convert to platform → sale_channel=platform, omit shop_variants
-        // - convert to shop / shops edited → sale_channel=shop + full shop_variants
-        // Variants: omit unless the Variants tab changed them (full replace otherwise).
+        // Always send every variant row (id + attributes_values_ids + is_active).
+        // Skipping "unchanged" rows is what left the 2nd SKU without attributes / shop link.
         const originalChannel: 'platform' | 'shop' =
           productResponse?.sale_channel === 'shop' || productResponse?.is_restaurant
             ? 'shop'
             : 'platform';
         const channelChanged = saleChannel !== originalChannel;
-        const shopsDirty = isDeepDirty(dirtyFields.shop_variants);
-        const variantsDirty = isDeepDirty(dirtyFields.variants);
+        const shopIdDirty = Boolean(dirtyFields.shop_id);
+        const vendorDirty = Boolean(dirtyFields.vendor_id);
 
-        if (!variantsDirty) {
-          delete editApiPayload.variants;
-        }
+        delete editApiPayload.shop_variants;
 
-        if (!channelChanged && !shopsDirty) {
-          delete editApiPayload.sale_channel;
-          delete editApiPayload.shop_variants;
-          delete editApiPayload.vendor_id;
-        } else if (saleChannel === 'platform') {
+        if (saleChannel === 'platform') {
           editApiPayload.sale_channel = 'platform';
-          delete editApiPayload.shop_variants;
           delete editApiPayload.vendor_id;
-        } else {
+          delete editApiPayload.shop_id;
+        } else if (channelChanged || shopIdDirty || vendorDirty || selectedShopId > 0) {
           editApiPayload.sale_channel = 'shop';
-          // shop_variants kept (full replace when linking to a shop)
+          if (selectedShopId > 0) editApiPayload.shop_id = selectedShopId;
+        } else {
+          delete editApiPayload.sale_channel;
+          delete editApiPayload.shop_id;
+          delete editApiPayload.vendor_id;
         }
 
         console.log('[Product Form] Sending update payload:', { id, data: editApiPayload });
@@ -2451,8 +2189,6 @@ export default function CreatePage() {
 
   /** Index of the variant row currently being created via PUT /products/{id}. */
   const [variantCreateBusyIdx, setVariantCreateBusyIdx] = useState<number | null>(null);
-  /** Field-array index of the shop-variant row currently being created via PUT /products/{id}. */
-  const [shopVariantCreateBusyIdx, setShopVariantCreateBusyIdx] = useState<number | null>(null);
 
   const applySavedVariantImages = useCallback(
     async (variantIndex: number, variantId: number) => {
@@ -2533,12 +2269,24 @@ export default function CreatePage() {
           | 'percentage'
           | 'fixed'
           | undefined) ?? 'none';
-      const vDiscRaw = getValues(`variants.${variantIndex}.discount`);
-      const vDiscVal =
-        vDiscRaw == null || vDiscRaw === ('' as any) ? undefined : Number(vDiscRaw);
-      const attrIds = (getValues(`variants.${variantIndex}.attributes_values_ids`) ?? [])
+      const vDiscVal = parseOptionalDiscount(getValues(`variants.${variantIndex}.discount`));
+      if (vDiscType === 'percentage' && vDiscVal != null && vDiscVal > 100) {
+        toast.error(t('productVariantsModalInvalidDiscountPercent'));
+        return;
+      }
+      const liveAttrIds = (getValues(`variants.${variantIndex}.attributes_values_ids`) ?? [])
         .map(Number)
         .filter((n) => Number.isFinite(n) && n > 0);
+      const apiVariant =
+        variantId && productResponse?.variants
+          ? productResponse.variants.find((v) => Number(v.id) === Number(variantId))
+          : undefined;
+      const attrIds = mergeVariantAttributeValueIds(
+        liveAttrIds,
+        extractVariantAttributeValueIds(apiVariant),
+        categoryAttributes,
+        apiVariant?.attributes
+      );
 
       if (variantId) {
         try {
@@ -2587,6 +2335,11 @@ export default function CreatePage() {
         });
         if (newId > 0) {
           setValue(`variants.${variantIndex}.id`, newId, { shouldDirty: false });
+          if (attrIds.length > 0) {
+            setValue(`variants.${variantIndex}.attributes_values_ids`, attrIds, {
+              shouldDirty: false,
+            });
+          }
           await applySavedVariantImages(variantIndex, newId);
           toast.success(t('form.variantCreateSuccess'));
         } else {
@@ -2607,6 +2360,8 @@ export default function CreatePage() {
       applySavedVariantImages,
       setValue,
       sypRate,
+      productResponse,
+      categoryAttributes,
       t,
     ]
   );
@@ -2735,37 +2490,10 @@ export default function CreatePage() {
               </Box>
             ) : null}
 
-            {isRestaurantToggle && selectedRestaurantShopId > 0 ? (
-              <ProductShopVariantsSection
-                variantIndex={0}
-                shops={
-                  shops.length > 0
-                    ? shops
-                    : [{ id: selectedRestaurantShopId, name: selectedRestaurantShopInitialLabel ?? '' }]
-                }
-                shopVariantsFields={shopVariantsFields}
-                watchedShopVariants={watchedShopVariants}
-                control={control}
-                watch={watch}
-                setValue={setValue}
-                appendShopVariant={appendShopVariant}
-                removeShopVariant={removeShopVariant}
-                isEditMode={isEditMode}
-                productId={id}
-                shopVariantCreateBusyIdx={shopVariantCreateBusyIdx}
-                setShopVariantCreateBusyIdx={setShopVariantCreateBusyIdx}
-                updateShopVariantMutation={updateShopVariantMutation}
-                createSingleShopVariantOnProduct={createSingleShopVariantOnProduct}
-                embedded
-                hideShopSelect
-                hideAddButton
-                requireParentVariantId={false}
-              />
-            ) : null}
           </Box>
         )}
 
-        {(errors.category_id || errors.vendor_id) && (
+        {(errors.category_id || errors.vendor_id || errors.shop_id) && (
           <Box className="mb-4 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 space-y-1">
             {errors.category_id?.message ? (
               <Typography variant="caption" className="text-destructive block">
@@ -2775,6 +2503,11 @@ export default function CreatePage() {
             {errors.vendor_id?.message ? (
               <Typography variant="caption" className="text-destructive block">
                 {errors.vendor_id.message}
+              </Typography>
+            ) : null}
+            {errors.shop_id?.message ? (
+              <Typography variant="caption" className="text-destructive block">
+                {errors.shop_id.message}
               </Typography>
             ) : null}
           </Box>
@@ -2849,25 +2582,6 @@ export default function CreatePage() {
               </Typography>
               <Typography variant="caption" className="text-orange-600/80">
                 {t('form.restaurantModeHelper')}
-              </Typography>
-            </div>
-          </Box>
-        )}
-
-        {/* ─── Missing branch link warning ──────────────────────── */}
-        {productMissingShopLink && (
-          <Box className="flex items-start gap-3 p-4 rounded-lg border border-destructive/30 bg-destructive/10">
-            <Iconify
-              icon="solar:danger-triangle-bold"
-              className="text-destructive shrink-0 mt-0.5"
-              width={20}
-            />
-            <div>
-              <Typography variant="subtitle2" className="font-semibold text-destructive">
-                {t('form.productNoShopLinkTitle')}
-              </Typography>
-              <Typography variant="caption" className="text-destructive/80">
-                {t('form.productNoShopLinkHelper')}
               </Typography>
             </div>
           </Box>
@@ -2989,7 +2703,7 @@ export default function CreatePage() {
             </Box>
           )}
 
-          {/* Sale channel: site (platform) vs branch-linked shop — no warehouse/external radios */}
+          {/* Sale channel: site (platform) vs one shop — no branch list */}
           {!isRestaurantToggle && (
           <Box className="group">
             <Box className="flex items-center gap-2 mb-2">
@@ -3012,6 +2726,7 @@ export default function CreatePage() {
                         field.onChange('platform');
                         setValue('vendor_scope', 'internal');
                         setValue('vendor_id', INTERNAL_VENDOR_ID);
+                        setValue('shop_id', 0);
                         setValue('shop_variants', []);
                         setValue('delivery_time', '');
                       }}
@@ -3027,6 +2742,7 @@ export default function CreatePage() {
                         field.onChange('shop');
                         setValue('vendor_scope', 'external');
                         setValue('vendor_id', 0);
+                        setValue('shop_id', 0);
                         setValue('shop_variants', []);
                       }}
                     />
@@ -3037,6 +2753,9 @@ export default function CreatePage() {
             />
             {saleChannelWatch === 'platform' ? (
               <Box className="mt-3 space-y-2">
+                <Typography variant="caption" className="text-muted-foreground block">
+                  {t('form.saleChannelPlatformHint')}
+                </Typography>
                 <Box>
                   <Typography variant="caption" className="text-muted-foreground mb-1 block">
                     {t('form.productDeliveryTime')}
@@ -3074,6 +2793,32 @@ export default function CreatePage() {
                   />
                 </Box>
                 <Box>
+                  <Typography variant="caption" className="text-muted-foreground mb-1 block">
+                    {t('form.selectShop')}
+                  </Typography>
+                  <RHFInfiniteSelect
+                    name="shop_id"
+                    queryKey={[
+                      'shops',
+                      'infinite',
+                      'product-form',
+                      'sale-channel-shop',
+                      shopVendorFilterId,
+                    ]}
+                    fetcher={shopFetcher}
+                    placeholder={t('form.selectShop')}
+                    clearable
+                    initialLabel={
+                      productResponse?.shop?.name
+                        ? formatTranslated(productResponse.shop.name as any)
+                        : undefined
+                    }
+                  />
+                  {errors.shop_id?.message ? (
+                    <FieldErrorText message={errors.shop_id.message} />
+                  ) : null}
+                </Box>
+                <Box>
                   <Box className="flex items-center gap-2 mb-2">
                     <Iconify icon="solar:clock-circle-bold" className="text-primary" width={20} />
                     <Typography variant="subtitle2" className="font-semibold text-foreground">
@@ -3097,15 +2842,6 @@ export default function CreatePage() {
                     )}
                   />
                 </Box>
-                {errors.shop_variants?.message ||
-                (errors.shop_variants as { root?: { message?: string } })?.root?.message ? (
-                  <FieldErrorText
-                    message={
-                      (errors.shop_variants as { message?: string })?.message ||
-                      (errors.shop_variants as { root?: { message?: string } })?.root?.message
-                    }
-                  />
-                ) : null}
               </Box>
             ) : null}
           </Box>
@@ -4079,19 +3815,10 @@ export default function CreatePage() {
             <>
               {!restaurantMode && categoryAttributes.length > 0 ? (
               <VariantGeneratorPanel
-                categoryAttributes={categoryAttributes as Array<{
-                  id: number;
-                  name?: { ar?: string; en?: string } | string;
-                  type?: string;
-                  values?: Array<{
-                    id: number;
-                    name?: { ar?: string; en?: string } | string;
-                    color?: { hex?: string } | null;
-                  }>;
-                }>}
+                categoryAttributes={categoryAttributes}
                 productSku={String(watchedProductSku ?? '')}
                 existingComboKeys={existingVariantComboKeys}
-                onAdd={(row: GeneratedVariantRow) => appendVariant(row)}
+                onAdd={(row: GeneratedVariantRow) => appendVariantWithShopLinks(row)}
                 t={t}
                 formatAttributeLabel={attributeLabel}
               />
@@ -4101,7 +3828,7 @@ export default function CreatePage() {
                     type="button"
                     variant="contained"
                     size="medium"
-                    onClick={() => appendVariant(makeBlankVariantRow())}
+                    onClick={() => appendVariantWithShopLinks(makeBlankVariantRow())}
                   >
                     <Iconify icon="solar:add-circle-bold" width={18} className="me-1.5" />
                     {t('form.addVariant')}
@@ -4111,12 +3838,9 @@ export default function CreatePage() {
 
               <ProductVariantsCardList
                   variants={variantsFields}
-                  categoryAttributes={categoryAttributes as Parameters<typeof resolveAttributeValuesByIds>[0]}
+                  categoryAttributes={categoryAttributes}
                   resolveValueRefs={(valueIds) =>
-                    resolveAttributeValuesByIds(
-                      categoryAttributes as Parameters<typeof resolveAttributeValuesByIds>[0],
-                      valueIds
-                    )
+                    resolveAttributeValuesByIds(categoryAttributes, valueIds)
                   }
                   control={control}
                   watch={watch}
@@ -4128,18 +3852,8 @@ export default function CreatePage() {
                   watchedProductSku={String(watchedProductSku ?? '')}
                   restaurantMode={restaurantMode}
                   isEditMode={isEditMode}
-                  isShopSaleChannel={isShopSaleChannel}
                   productId={id}
                   productResponse={productResponse}
-                  shops={shops}
-                  shopVariantsFields={shopVariantsFields}
-                  watchedShopVariants={watchedShopVariants}
-                  appendShopVariant={appendShopVariant}
-                  removeShopVariant={removeShopVariant}
-                  shopVariantCreateBusyIdx={shopVariantCreateBusyIdx}
-                  setShopVariantCreateBusyIdx={setShopVariantCreateBusyIdx}
-                  updateShopVariantMutation={updateShopVariantMutation}
-                  createSingleShopVariantOnProduct={createSingleShopVariantOnProduct}
                   onRemove={(variantIndex) => void confirmAndRemoveVariant(variantIndex)}
                   onSave={(variantIndex) => saveVariantRow(variantIndex)}
                   isSavingIndex={variantCreateBusyIdx}

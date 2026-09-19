@@ -18,7 +18,7 @@ import { _ColorApi } from '@/pages/dashboard/colors/api/color.services';
 import { Box, Button, Typography } from 'src/shared/ui';
 
 import { VariantImagesField } from './VariantImagesField';
-import { ProductShopVariantsSection } from '../view/product/ProductShopVariantsSection';
+import { toOptionalDiscount } from './variant-field-helpers';
 import {
   generateVariantSku,
   priceAfterDiscount,
@@ -124,24 +124,8 @@ type VariantRowProps = {
   watchedProductSku: string;
   restaurantMode: boolean;
   isEditMode: boolean;
-  isShopSaleChannel: boolean;
   productId?: string;
   productResponse?: { variants?: Array<{ id: number; images?: Array<{ id: number; url: string }> }> };
-  shops: unknown[];
-  shopVariantsFields: unknown[];
-  watchedShopVariants: ProductFormValues['shop_variants'];
-  appendShopVariant: (row: NonNullable<ProductFormValues['shop_variants']>[number]) => void;
-  removeShopVariant: (index: number) => void;
-  shopVariantCreateBusyIdx: number | null;
-  setShopVariantCreateBusyIdx: (v: number | null) => void;
-  updateShopVariantMutation: { isPending: boolean; mutateAsync: (args: any) => Promise<any> };
-  createSingleShopVariantOnProduct: (args: {
-    productId: number | string;
-    parentVariantId: number;
-    parentVariantIndex: number;
-    shopId: number;
-    costPrice: number | undefined;
-  }) => Promise<number>;
   isExpanded: boolean;
   onToggleExpand: () => void;
   onRemove: () => void;
@@ -167,18 +151,8 @@ function VariantTableRow({
   watchedProductSku,
   restaurantMode,
   isEditMode,
-  isShopSaleChannel,
-  productId,
+  productId: _productId,
   productResponse: _productResponse,
-  shops,
-  shopVariantsFields,
-  watchedShopVariants,
-  appendShopVariant,
-  removeShopVariant,
-  shopVariantCreateBusyIdx,
-  setShopVariantCreateBusyIdx,
-  updateShopVariantMutation,
-  createSingleShopVariantOnProduct,
   isExpanded,
   onToggleExpand,
   onRemove,
@@ -427,7 +401,26 @@ function VariantTableRow({
                       <select
                         className={cellInputCls}
                         value={f.value ?? 'none'}
-                        onChange={(e) => f.onChange(e.target.value)}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          f.onChange(next);
+                          if (next === 'none') {
+                            setValue(
+                              `variants.${variantIndex}.discount`,
+                              undefined as unknown as number,
+                              { shouldDirty: true }
+                            );
+                            return;
+                          }
+                          if (next === 'percentage') {
+                            const current = Number(watch(`variants.${variantIndex}.discount`));
+                            if (Number.isFinite(current) && current > 100) {
+                              setValue(`variants.${variantIndex}.discount`, 100, {
+                                shouldDirty: true,
+                              });
+                            }
+                          }
+                        }}
                         onBlur={f.onBlur}
                         name={f.name}
                         ref={f.ref}
@@ -450,13 +443,16 @@ function VariantTableRow({
                       <input
                         type="number"
                         min={0}
+                        max={discountType === 'percentage' ? 100 : undefined}
                         step="any"
                         disabled={discountType === 'none'}
                         name={f.name}
                         ref={f.ref}
                         onBlur={f.onBlur}
                         value={optionalNumberInputDisplay(f.value)}
-                        onChange={(e) => f.onChange(toTwoDecimalNumber(e.target.value))}
+                        onChange={(e) =>
+                          f.onChange(toOptionalDiscount(e.target.value, discountType))
+                        }
                         className={cellInputCls}
                       />
                     )}
@@ -525,28 +521,6 @@ function VariantTableRow({
                 t={t}
                 compact
               />
-
-              {isShopSaleChannel ? (
-                <ProductShopVariantsSection
-                  variantIndex={variantIndex}
-                  shops={shops as Parameters<typeof ProductShopVariantsSection>[0]['shops']}
-                  shopVariantsFields={
-                    shopVariantsFields as Parameters<typeof ProductShopVariantsSection>[0]['shopVariantsFields']
-                  }
-                  watchedShopVariants={watchedShopVariants ?? []}
-                  control={control}
-                  watch={watch}
-                  setValue={setValue}
-                  appendShopVariant={appendShopVariant}
-                  removeShopVariant={removeShopVariant}
-                  isEditMode={isEditMode}
-                  productId={productId}
-                  shopVariantCreateBusyIdx={shopVariantCreateBusyIdx}
-                  setShopVariantCreateBusyIdx={setShopVariantCreateBusyIdx}
-                  updateShopVariantMutation={updateShopVariantMutation}
-                  createSingleShopVariantOnProduct={createSingleShopVariantOnProduct}
-                />
-              ) : null}
 
               {variantRowErrors ? (
                 <Typography variant="caption" className="text-destructive">

@@ -16,17 +16,29 @@ import { getApiErrorMessage } from '@/lib/get-api-error-message';
 import { iconArtworkSrc } from '@/pages/dashboard/icons/utils/icon-artwork';
 import { useFetchProductById } from '@/pages/dashboard/products/hooks/product';
 import { useFetchCurrencies } from '@/pages/dashboard/currencies/hooks/currency';
-import { priceAfterDiscount } from '@/pages/dashboard/products/utils/variant-combinations';
+import { useRootCategoryId } from '@/pages/dashboard/categories/hooks/category';
+import { VariantAttributeSelects } from '@/pages/dashboard/products/components/VariantAttributeSelects';
+import { useFetchCategoryAttributes } from '@/pages/dashboard/categories/hooks/category-attribute';
+import {
+  priceAfterDiscount,
+  attributeValueLabel,
+  generateRandomVariantSku,
+  sanitizeEnglishSkuInput,
+  resolveAttributeValueId,
+  mergeVariantAttributeValueIds,
+  toCategoryAttributePickerRows,
+  ensureCategoryAttributesFromVariants,
+  type CategoryAttributePickerRow,
+} from '@/pages/dashboard/products/utils/variant-combinations';
 import { useVariantDeleteFlow } from '@/pages/dashboard/products/hooks/use-variant-delete-flow';
 import { VariantDeleteImpactDialog } from '@/pages/dashboard/products/components/VariantDeleteImpactDialog';
 import { formatDecimal, normalizeFormattedMoneyText, formatApiCurrencyAmountForLanguage } from '@/utils/format-currency';
+import { useUpdateProductVariant } from '@/pages/dashboard/products/hooks/product-variant';
 import {
-  useUpdateProductVariant,
-  useUpdateShopProductVariant,
-} from '@/pages/dashboard/products/hooks/product-variant';
-import {
+  isHiddenDefaultVariant,
   variantImageFieldsFromRow,
   normalizeVariantExistingImages,
+  extractVariantAttributeValueIds,
 } from '@/pages/dashboard/products/utils/variant-payload';
 import {
   ProductDetailsTag,
@@ -239,6 +251,7 @@ interface EditVariantModalProps {
   variant: any;
   /** When product category is restaurant, variant model/barcode are not used. */
   isRestaurant?: boolean;
+  categoryAttributes?: CategoryAttributePickerRow[];
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -247,6 +260,7 @@ function EditVariantModal({
   open,
   variant,
   isRestaurant = false,
+  categoryAttributes = [],
   onClose,
   onSuccess,
 }: EditVariantModalProps) {
@@ -289,6 +303,7 @@ function EditVariantModal({
   const [discountType, setDiscountType] = useState<'none' | 'percentage' | 'fixed'>('none');
   const [discount, setDiscount] = useState<string>('');
   const [newImages, setNewImages] = useState<File[]>([]);
+  const [attrIds, setAttrIds] = useState<number[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -320,6 +335,7 @@ function EditVariantModal({
           : ''
       );
       setNewImages([]);
+      setAttrIds(extractVariantAttributeValueIds(variant));
     }
   }, [open, variant, dualPriceReady, sypRate]);
 
@@ -334,7 +350,12 @@ function EditVariantModal({
 
   const handleSubmit = async () => {
     if (!variant?.id) return;
-    const attrIds: number[] = (variant.attributes ?? []).map((a: any) => a.value_id ?? a.id).filter(Boolean);
+    const nextAttrIds = mergeVariantAttributeValueIds(
+      attrIds,
+      extractVariantAttributeValueIds(variant),
+      categoryAttributes,
+      variant?.attributes
+    );
     const originalIds = normalizeVariantExistingImages(variant.images).map((img) => img.id);
     const imageFields = variantImageFieldsFromRow({
       images: newImages,
@@ -346,28 +367,39 @@ function EditVariantModal({
         ? await compressImages(imageFields.images)
         : undefined;
     const priceNum = price !== '' ? Number(price) : undefined;
-    const priceSypNum =
-      priceNum != null
-        ? undefined
-        : priceSyp !== ''
-          ? Number(priceSyp)
+    const priceSypNum = priceSyp !== '' ? Number(priceSyp) : undefined;
+    const priceUsd =
+      priceNum != null && Number.isFinite(priceNum)
+        ? priceNum
+        : priceSypNum != null && Number.isFinite(priceSypNum) && sypRate > 0
+          ? Math.round((priceSypNum / sypRate) * 100) / 100
           : undefined;
     const discountNum = discount !== '' ? Number(discount) : undefined;
+    if (discountType !== 'none') {
+      if (discountNum == null || !Number.isFinite(discountNum) || discountNum < 0) {
+        toast.error(t('productVariantsModalInvalidDiscount'));
+        return;
+      }
+      if (discountType === 'percentage' && discountNum > 100) {
+        toast.error(t('productVariantsModalInvalidDiscountPercent'));
+        return;
+      }
+    }
+    const skuVal = sanitizeEnglishSkuInput(sku).trim();
     updateVariant(
       {
         id: variant.id,
         data: {
           is_trend: isTrend,
           is_active: isActive,
-          attributes_values_ids: attrIds,
+          attributes_values_ids: nextAttrIds,
           ...(imageFields.existing_images_ids !== undefined
             ? { existing_images_ids: imageFields.existing_images_ids }
             : {}),
           ...(images ? { images } : {}),
-          sku,
+          ...(skuVal ? { sku: skuVal } : {}),
           ...(isRestaurant ? { model: '', barcode: '' } : { model, barcode }),
-          price: priceNum,
-          price_syp: priceSypNum,
+          ...(priceUsd != null ? { price: priceUsd } : {}),
           quantity: quantity !== '' ? Math.max(0, Math.floor(Number(quantity))) : undefined,
           discount_type: discountType,
           discount: discountType === 'none' ? 0 : discountNum,
@@ -391,6 +423,19 @@ function EditVariantModal({
       title={t('form.productDetailsEditVariantTitle', { id: variant?.id ?? '' })}
       content={
         <Box className="space-y-4">
+          {categoryAttributes.length > 0 ? (
+            <VariantAttributeSelects
+              categoryAttributes={categoryAttributes}
+              selectedIds={attrIds}
+              variantAttributes={variant?.attributes}
+              formatAttributeLabel={(name) =>
+                formatTranslated(name as Parameters<typeof formatTranslated>[0], '')
+              }
+              t={t}
+              onChange={setAttrIds}
+            />
+          ) : null}
+
           {/* is_trend */}
           <Box>
             <Typography variant="body2" className="text-muted-foreground mb-1 font-medium">
@@ -439,19 +484,20 @@ function EditVariantModal({
 
           <Box>
             <Typography variant="body2" className="text-muted-foreground mb-1 font-medium">
-              {t('form.productSku')}
+              {t('form.variantSku')}
             </Typography>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={sku}
-                onChange={(e) => setSku(e.target.value)}
+                placeholder={t('form.variantSkuPlaceholder')}
+                onChange={(e) => setSku(sanitizeEnglishSkuInput(e.target.value))}
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
               />
               <button
                 type="button"
                 title={t('form.generateSku')}
-                onClick={() => setSku('SKU-' + Math.random().toString(36).substring(2, 10).toUpperCase())}
+                onClick={() => setSku(generateRandomVariantSku())}
                 className="flex items-center justify-center rounded-md border border-border bg-muted px-2 hover:bg-muted/80 transition-colors"
               >
                 <Iconify icon="solar:shuffle-bold" width={18} />
@@ -478,6 +524,7 @@ function EditVariantModal({
                 <input
                   type="text"
                   value={barcode}
+                  placeholder={t('form.variantBarcodePlaceholder')}
                   onChange={(e) => setBarcode(e.target.value)}
                   className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                 />
@@ -580,9 +627,18 @@ function EditVariantModal({
               </Typography>
               <select
                 value={discountType}
-                onChange={(e) =>
-                  setDiscountType(e.target.value as 'none' | 'percentage' | 'fixed')
-                }
+                onChange={(e) => {
+                  const next = e.target.value as 'none' | 'percentage' | 'fixed';
+                  setDiscountType(next);
+                  if (next === 'none') {
+                    setDiscount('');
+                    return;
+                  }
+                  if (next === 'percentage') {
+                    const n = Number(discount);
+                    if (Number.isFinite(n) && n > 100) setDiscount('100');
+                  }
+                }}
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
               >
                 <option value="none">{t('form.discountTypeNone')}</option>
@@ -590,6 +646,7 @@ function EditVariantModal({
                 <option value="fixed">{t('form.discountTypeFixed')}</option>
               </select>
             </Box>
+            {discountType !== 'none' ? (
             <Box>
               <Typography variant="body2" className="text-muted-foreground mb-1 font-medium">
                 {t('form.productDiscountValue')}
@@ -597,13 +654,14 @@ function EditVariantModal({
               <input
                 type="number"
                 min={0}
+                max={discountType === 'percentage' ? 100 : undefined}
                 step="any"
-                disabled={discountType === 'none'}
                 value={discount}
                 onChange={(e) => setDiscount(e.target.value)}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
               />
             </Box>
+            ) : null}
           </Box>
           {price !== '' ? (
             <Box>
@@ -711,107 +769,37 @@ function parseShopVariantCurrencyRate(c: CurrencyData): number {
   return r > 0 ? r : 1;
 }
 
-function shopVariantLocalToUsd(local: number, exchangeRate: number): number {
-  const r = exchangeRate > 0 ? exchangeRate : 1;
-  return local / r;
-}
-
-function shopVariantUsdToLocal(usd: number, exchangeRate: number): number {
-  const r = exchangeRate > 0 ? exchangeRate : 1;
-  return usd * r;
-}
-
-// ----------------------------------------------------------------------
-// Shop Product Variant Edit Modal
-
-interface EditShopVariantModalProps {
-  open: boolean;
-  shopVariant: any;
-  onClose: () => void;
-  onSuccess: () => void;
-}
-
-function EditShopVariantModal({ open, shopVariant, onClose, onSuccess }: EditShopVariantModalProps) {
-  const { t } = useTranslation('table');
-  const { mutate: updateShopVariant, isPending } = useUpdateShopProductVariant();
-
-  const [costPrice, setCostPrice] = useState<string>('');
-
-  useEffect(() => {
-    if (open && shopVariant) {
-      setCostPrice(shopVariant.cost_price != null ? String(shopVariant.cost_price) : '');
-    }
-  }, [open, shopVariant]);
-
-  const handleSubmit = () => {
-    if (!shopVariant?.id) return;
-    updateShopVariant(
-      {
-        id: shopVariant.id,
-        data: {
-          cost_price: costPrice !== '' ? Number(costPrice) : undefined,
-        },
-      },
-      {
-        onSuccess: () => {
-          toast.success(t('form.shopVariantSaveSuccess'));
-          onSuccess();
-          onClose();
-        },
-      }
-    );
-  };
-
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="sm"
-      title={t('form.productDetailsEditShopVariantTitle', { id: shopVariant?.id ?? '' })}
-      content={
-        <Box className="space-y-3">
-          <Box>
-            <Typography variant="body2" className="text-muted-foreground mb-1 font-medium">
-              {t('form.branchCostPriceLabel')}
-            </Typography>
-            <input
-              type="number"
-              step="0.01"
-              min={0}
-              value={costPrice}
-              onChange={(e) => setCostPrice(e.target.value)}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
-            <Typography variant="caption" className="text-muted-foreground mt-1 block">
-              {t('form.branchCostPriceHint')}
-            </Typography>
-          </Box>
-        </Box>
-      }
-      actions={
-        <>
-          <Button variant="outlined" onClick={onClose} disabled={isPending}>
-            {t('cancel')}
-          </Button>
-          <Button variant="contained" onClick={handleSubmit} disabled={isPending}>
-            {isPending ? t('form.savingVariant') : t('save')}
-          </Button>
-        </>
-      }
-    />
-  );
-}
-
-// ----------------------------------------------------------------------
-
 export default function DetailsPage() {
   const { t, i18n } = useTranslation('table');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: productResponse, isLoading, error, refetch } = useFetchProductById(id || '');
+  const productCategoryId = Number((productResponse as { category?: { id?: number } } | undefined)?.category?.id) || 0;
+  const { data: rootCategoryId } = useRootCategoryId(productCategoryId || undefined);
+  const { data: categoryAttributesAll } = useFetchCategoryAttributes(
+    {
+      page: 1,
+      per_page: 100,
+      category_id: rootCategoryId,
+    },
+    { requireCategoryId: true }
+  );
+  const categoryAttributes = useMemo(
+    () =>
+      ensureCategoryAttributesFromVariants(
+        toCategoryAttributePickerRows(
+          (categoryAttributesAll?.data as { items?: unknown[]; data?: unknown[] } | undefined)
+            ?.items ??
+            (categoryAttributesAll?.data as { data?: unknown[] } | undefined)?.data ??
+            []
+        ),
+        (productResponse as { variants?: Array<{ attributes?: Array<{ category_attribute_id?: number }> }> } | undefined)
+          ?.variants ?? []
+      ),
+    [categoryAttributesAll, productResponse]
+  );
 
   const [editVariant, setEditVariant] = useState<any>(null);
-  const [editShopVariant, setEditShopVariant] = useState<any>(null);
   const [heroImageIndex, setHeroImageIndex] = useState(0);
 
   // Both deletes preview their impact first, so the user sees what is removed (basket /
@@ -823,16 +811,6 @@ export default function DetailsPage() {
       refetch();
     },
     onError: (err) => toast.error(getApiErrorMessage(err, t('form.variantDeleteFailed'))),
-  });
-
-  const shopVariantDeleteFlow = useVariantDeleteFlow({
-    target: 'shop_product_variant',
-    onDeleted: () => {
-      toast.success(t('form.productDetailsShopVariantDeleteSuccess'));
-      refetch();
-    },
-    onError: (err) =>
-      toast.error(getApiErrorMessage(err, t('form.productDetailsShopVariantDeleteFailed'))),
   });
 
   useEffect(() => {
@@ -879,7 +857,10 @@ export default function DetailsPage() {
   const gallery: Array<{ id?: number; url: string }> = Array.isArray(product.images) ? product.images : [];
   const heroSrc =
     gallery[heroImageIndex]?.url ?? (typeof product.thumbnail === 'string' ? product.thumbnail : undefined);
-  const variantCount = Array.isArray(product.variants) ? product.variants.length : 0;
+  const visibleVariants = (Array.isArray(product.variants) ? product.variants : []).filter(
+    (variant: unknown) => !isHiddenDefaultVariant(variant, categoryAttributes.length)
+  );
+  const variantCount = visibleVariants.length;
 
   const seoKw = seoKeywordsLines(product.seo_keywords);
   const seoImageAlt =
@@ -1196,13 +1177,13 @@ export default function DetailsPage() {
             )}
 
             {/* Variants */}
-            {product.variants?.length > 0 && (
+            {visibleVariants.length > 0 && (
               <ProductDetailsSection
-                title={`${t('form.productDetailsVariants')} (${product.variants.length})`}
+                title={`${t('form.productDetailsVariants')} (${visibleVariants.length})`}
                 icon="solar:widget-bold"
               >
                 <Box className="space-y-4">
-                  {product.variants.map((variant: any, i: number) => (
+                  {visibleVariants.map((variant: any, i: number) => (
                     <ProductDetailsVariantCard
                       key={variant.id ?? i}
                       header={
@@ -1275,25 +1256,58 @@ export default function DetailsPage() {
                         )}
                       </Box>
 
-                      {/* Attributes */}
-                      {variant.attributes?.length > 0 && (
+                      {/* One tag per attribute — never join values into a single "Red XS" label. */}
+                      {(categoryAttributes.length > 0 || variant.attributes?.length > 0) && (
                         <Box>
                           <Typography variant="caption" className="text-muted-foreground mb-2 block">
                             {t('form.productDetailsAttributes')}
                           </Typography>
                           <Box className="flex flex-wrap gap-2">
-                            {variant.attributes.map((attr: any, ai: number) => {
-                              const attrValue = toDisplayString(attr.value);
-                              const isColor = attr.type === 'color';
-                              return (
-                                <ProductDetailsTag
-                                  key={ai}
-                                  label={toDisplayString(attr.attribute)}
-                                  value={attrValue}
-                                  colorDot={isColor ? attrValue : undefined}
-                                />
-                              );
-                            })}
+                            {categoryAttributes.length > 0
+                              ? categoryAttributes.map((attr) => {
+                                  const selectedIds = extractVariantAttributeValueIds(variant);
+                                  const selectedId = resolveAttributeValueId(
+                                    selectedIds,
+                                    attr,
+                                    variant.attributes
+                                  );
+                                  const val = (attr.values ?? []).find(
+                                    (item) => Number(item.id) === selectedId
+                                  );
+                                  const valueLabel =
+                                    attributeValueLabel(val?.name) ||
+                                    toDisplayString(
+                                      variant.attributes?.find(
+                                        (a: { category_attribute_id?: number }) =>
+                                          Number(a.category_attribute_id) === Number(attr.id)
+                                      )?.value
+                                    ) ||
+                                    '—';
+                                  const isColor = String(attr.type ?? '').toLowerCase() === 'color';
+                                  return (
+                                    <ProductDetailsTag
+                                      key={attr.id}
+                                      label={formatTranslated(
+                                        attr.name as Parameters<typeof formatTranslated>[0],
+                                        ''
+                                      )}
+                                      value={valueLabel}
+                                      colorDot={isColor ? valueLabel : undefined}
+                                    />
+                                  );
+                                })
+                              : variant.attributes.map((attr: any, ai: number) => {
+                                  const attrValue = toDisplayString(attr.value);
+                                  const isColor = attr.type === 'color';
+                                  return (
+                                    <ProductDetailsTag
+                                      key={attr.id ?? ai}
+                                      label={toDisplayString(attr.attribute)}
+                                      value={attrValue}
+                                      colorDot={isColor ? attrValue : undefined}
+                                    />
+                                  );
+                                })}
                           </Box>
                         </Box>
                       )}
@@ -1319,7 +1333,6 @@ export default function DetailsPage() {
                         </Box>
                       )}
 
-                      {/* Variant price/stock — shared across every shop */}
                       <Box>
                         <Typography variant="caption" className="mb-2 block text-muted-foreground">
                           {t('form.productDetailsVariantPriceStockTitle')}
@@ -1352,63 +1365,6 @@ export default function DetailsPage() {
                         </Box>
                       </Box>
 
-                      {/* Shop availability */}
-                      {variant.shops?.length > 0 && (
-                        <Box>
-                          <Typography variant="caption" className="mb-2 block text-muted-foreground">
-                            {t('form.productDetailsShopPricing')}
-                          </Typography>
-                          <Box className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                            {variant.shops.map((shop: any, si: number) => (
-                              <Box
-                                key={shop.id ?? si}
-                                className="rounded-xl border border-border/45 bg-muted/15 p-3 shadow-sm"
-                              >
-                                <Box className="flex flex-wrap items-start justify-between gap-2">
-                                  <Box className="min-w-0">
-                                    <Typography variant="body2" className="font-semibold text-foreground">
-                                      {shop.shop_name}
-                                    </Typography>
-                                    {shop.is_restaurant ? (
-                                      <Typography variant="caption" className="text-muted-foreground">
-                                        {t('form.isRestaurant')}
-                                      </Typography>
-                                    ) : null}
-                                  </Box>
-                                  <Box className="flex shrink-0 gap-0.5">
-                                    <Button
-                                      size="small"
-                                      variant="text"
-                                      onClick={() => setEditShopVariant(shop)}
-                                      className="h-8 min-w-0 px-1.5 text-primary hover:bg-primary/10"
-                                    >
-                                      <Iconify icon="solar:pen-bold" width={14} />
-                                    </Button>
-                                    <Button
-                                      size="small"
-                                      variant="text"
-                                      disabled={shopVariantDeleteFlow.isDeleting}
-                                      onClick={() =>
-                                        shopVariantDeleteFlow.requestDelete(shop.id, undefined)
-                                      }
-                                      className="h-8 min-w-0 px-1.5 text-destructive hover:bg-destructive/10"
-                                    >
-                                      <Iconify icon="solar:trash-bin-minimalistic-bold" width={14} />
-                                    </Button>
-                                  </Box>
-                                </Box>
-                                <ProductDetailsMetricCell label={t('form.branchCostPriceLabel')}>
-                                  {productMoneyDisplay({
-                                    currencies: shop.cost_price_currencies,
-                                    amount: shop.cost_price,
-                                    legacyAmountPrefix: t('currencySyrianPound'),
-                                  })}
-                                </ProductDetailsMetricCell>
-                              </Box>
-                            ))}
-                          </Box>
-                        </Box>
-                      )}
                     </ProductDetailsVariantCard>
                   ))}
                 </Box>
@@ -1421,6 +1377,7 @@ export default function DetailsPage() {
                 open={!!editVariant}
                 variant={editVariant}
                 isRestaurant={isRestaurant}
+                categoryAttributes={categoryAttributes}
                 onClose={() => setEditVariant(null)}
                 onSuccess={() => refetch()}
               />
@@ -1428,19 +1385,6 @@ export default function DetailsPage() {
 
             {/* Delete Variant Confirm — lists what the delete touches before committing */}
             <VariantDeleteImpactDialog {...variantDeleteFlow.dialogProps} />
-
-            {/* Edit Shop Variant Modal */}
-            {editShopVariant && (
-              <EditShopVariantModal
-                open={!!editShopVariant}
-                shopVariant={editShopVariant}
-                onClose={() => setEditShopVariant(null)}
-                onSuccess={() => refetch()}
-              />
-            )}
-
-            {/* Delete Shop Variant Confirm — same impact preview as the variant delete */}
-            <VariantDeleteImpactDialog {...shopVariantDeleteFlow.dialogProps} />
 
             {/* Category Details */}
             {product.category_details?.length > 0 && (

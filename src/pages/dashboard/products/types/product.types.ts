@@ -38,7 +38,7 @@ export interface ProductData {
   /** Shelf life / expiry (ISO or YYYY-MM-DD from API) */
   expiry_date?: string | null;
   is_restaurant?: boolean;
-  /** `platform` = site/Tikmool; `shop` = linked to branch(es). */
+  /** `platform` = site/Tikmool; `shop` = linked to the vendor's shop. */
   sale_channel?: 'platform' | 'shop' | string | null;
 }
 
@@ -58,7 +58,10 @@ export interface ProductDetailData {
   category_id: number;
   brand_id: number | null;
   vendor_id?: number | null;
-  /** `platform` = sold on site (auto platform shop); `shop` = explicit branch links. */
+  /** Single shop when `sale_channel=shop`. */
+  shop_id?: number | null;
+  shop?: { id: number; name?: string | { en: string; ar: string } } | null;
+  /** `platform` = sold on site; `shop` = vendor's single shop. */
   sale_channel?: 'platform' | 'shop' | string | null;
   name: { en: string; ar: string };
   description: { en: string; ar: string };
@@ -138,7 +141,17 @@ export interface ProductDetailData {
     barcode?: string | null;
     is_trend?: boolean | number;
     is_active?: boolean | number;
-    attributes: Array<{ attribute: string; value: string; type: string }>;
+    /** Numeric attribute-value IDs — persist these; do not rebuild from the card label. */
+    attributes_values_ids?: number[];
+    attributes: Array<{
+      id?: number;
+      value_id?: number;
+      attribute: string;
+      value: string;
+      type: string;
+      hex?: string | null;
+      category_attribute_id?: number;
+    }>;
     /** Sale price/stock now live on the variant itself — shared across every shop. */
     price: number;
     price_currencies?: Record<string, ProductDetailCurrencyAmount> | null;
@@ -153,7 +166,7 @@ export interface ProductDetailData {
       id?: number;
       shop_id: number;
       shop_name: string;
-      /** Branch purchase cost only — not a sale price; sale price lives on the variant above. */
+      /** Internal purchase cost for this shop link — not a sale price. */
       cost_price?: number | null;
       cost_price_currencies?: Record<string, ProductDetailCurrencyAmount> | null;
     }>;
@@ -227,14 +240,16 @@ export interface ProductCreateUpdatePayload {
   category_id: number;
   brand_id?: number | null;
   vendor_id?: number;
-  /** `platform` = site product (no shop_variants); `shop` = must send shop_variants. */
+  /** Single shop when `sale_channel=shop`. Backend binds every variant to this shop. */
+  shop_id?: number;
+  /** `platform` = site product (no vendor/shop); `shop` = send `shop_id` or the vendor. */
   sale_channel?: 'platform' | 'shop';
   name: { en: string; ar: string };
   description: { en: string; ar: string };
   full_description?: { en: string; ar: string };
   country_id?: number;
   sale_country_id?: number;
-  /** Sale price in USD. Prefer this over `price_syp` when both are set (API ignores SYP). */
+  /** Sale price in USD. When both `price` and `price_syp` are sent, the API uses USD. */
   price?: number;
   /** Sale price in SYP — converted server-side when `price` is omitted. */
   price_syp?: number;
@@ -311,11 +326,12 @@ export interface ProductCreateUpdatePayload {
 
   bought_with?: number[];
 
+  /** Optional. Only send when setting `cost_price`. Backend ignores extra shop ids. */
   shop_variants?: Array<{
     id?: number;
     shop_id: number;
     variant_index: number;
-    /** Branch purchase cost only — not a sale price. */
+    /** Shop purchase cost only — not a sale price. */
     cost_price?: number;
   }>;
 
@@ -359,7 +375,7 @@ export interface AdminProductVariantListItem {
   shop_variants: Array<{
     id: number;
     shop: { id: number; name: string };
-    /** Branch purchase cost only — not a sale price. */
+    /** Shop purchase cost only — not a sale price. */
     cost_price?: number;
   }>;
   created_at?: string;

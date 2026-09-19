@@ -71,9 +71,8 @@ const buildVariantFormData = (data: ProductVariantUpdatePayload): FormData => {
   }
   if (data.price !== undefined) {
     formData.append('price', String(data.price));
-  } else if (data.price_syp !== undefined) {
-    formData.append('price_syp', String(data.price_syp));
   }
+  // PUT /product-variants/{id} does not accept price_syp — callers convert SYP → USD.
   if (data.quantity != null && !Number.isNaN(Number(data.quantity))) {
     formData.append('quantity', String(data.quantity));
   }

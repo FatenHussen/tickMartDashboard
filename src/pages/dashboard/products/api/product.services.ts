@@ -123,7 +123,8 @@ const appendVariantRows = (
     appendOptionalTrimmed(formData, `variants[${vIndex}][barcode]`, cleaned.barcode);
     if (cleaned.price !== undefined) {
       formData.append(`variants[${vIndex}][price]`, String(cleaned.price));
-    } else if (cleaned.price_syp !== undefined) {
+    }
+    if (cleaned.price_syp !== undefined) {
       formData.append(`variants[${vIndex}][price_syp]`, String(cleaned.price_syp));
     }
     if (cleaned.quantity != null && !Number.isNaN(Number(cleaned.quantity))) {
@@ -141,9 +142,10 @@ const appendVariantRows = (
     if (cleaned.is_trend !== undefined) {
       formData.append(`variants[${vIndex}][is_trend]`, Number(cleaned.is_trend) === 1 ? '1' : '0');
     }
-    if (cleaned.is_active !== undefined) {
-      formData.append(`variants[${vIndex}][is_active]`, Number(cleaned.is_active) === 1 ? '1' : '0');
-    }
+    formData.append(
+      `variants[${vIndex}][is_active]`,
+      Number(cleaned.is_active) === 0 ? '0' : '1'
+    );
   });
 };
 
@@ -181,7 +183,8 @@ const buildProductFormData = (data: ProductCreateUpdatePayload): FormData => {
   formData.append('description[ar]', data.description?.ar ?? '');
   if (data.price !== undefined && data.price !== null && !Number.isNaN(Number(data.price))) {
     formData.append('price', String(data.price));
-  } else if (
+  }
+  if (
     data.price_syp !== undefined &&
     data.price_syp !== null &&
     !Number.isNaN(Number(data.price_syp))
@@ -200,13 +203,17 @@ const buildProductFormData = (data: ProductCreateUpdatePayload): FormData => {
       : data.sale_channel === 'platform'
         ? 'platform'
         : undefined;
-  // Omit on name-only updates — sending platform again would re-bind the default branch.
   if (saleChannel != null) {
     formData.append('sale_channel', saleChannel);
   }
-  // Platform / omitted channel: backend owns Tikmool vendor + default branch — do not send vendor_id.
-  if (saleChannel === 'shop' && data.vendor_id != null && Number(data.vendor_id) > 0) {
-    formData.append('vendor_id', String(data.vendor_id));
+  // Platform: omit vendor_id / shop_id. Shop: shop_id once, or the vendor.
+  if (saleChannel === 'shop') {
+    if (data.shop_id != null && Number(data.shop_id) > 0) {
+      formData.append('shop_id', String(data.shop_id));
+    }
+    if (data.vendor_id != null && Number(data.vendor_id) > 0) {
+      formData.append('vendor_id', String(data.vendor_id));
+    }
   }
 
   const discountType = data.discount_type ?? 'none';
@@ -276,10 +283,15 @@ const buildProductFormData = (data: ProductCreateUpdatePayload): FormData => {
   // Whitelist-only. Empty arrays are omitted so the backend keeps current rows
   // (sending `variants: []` soft-deletes everything and seeds a default SKU).
   appendVariantRows(formData, data.variants);
-  // Shop channel only. Platform / omitted channel: never send shop_variants
-  // (name-only edit must leave existing links alone; platform convert rebinds on the backend).
-  if (saleChannel === 'shop') {
-    appendShopVariantRows(formData, data.shop_variants);
+  // Platform: never send shop_variants. Shop: only when a row has cost_price.
+  const shopVariantsWithCost = (data.shop_variants ?? []).filter(
+    (row) => row != null && row.cost_price != null && Number.isFinite(Number(row.cost_price))
+  );
+  if (
+    (saleChannel === 'shop' || saleChannel == null) &&
+    shopVariantsWithCost.length > 0
+  ) {
+    appendShopVariantRows(formData, shopVariantsWithCost);
   }
 
   const validCategoryDetails = (data.category_details ?? []).filter(

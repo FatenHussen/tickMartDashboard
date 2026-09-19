@@ -12,8 +12,6 @@ import { normalizeFormattedMoneyText } from '@/utils/format-currency';
 import { createToggleColumn } from '@/shared/ui/table-data/data-table-toggle-cell';
 import { DataTableRowActions } from '@/shared/ui/table-data/data-table-row-actions';
 import { DataTableColumnHeader } from '@/shared/ui/table-data/data-table-column-header';
-import { productRowHasNoShopLink } from '@/pages/dashboard/products/utils/variant-payload';
-
 import { paths } from 'src/routes/paths';
 
 import { CONFIG } from 'src/global-config';
@@ -325,15 +323,6 @@ export type ProductApprovalActions = {
   rejectingId: number | string | null;
 };
 
-/**
- * True only when the list row is a shop-channel product with explicit evidence that no
- * variant is linked to a branch. Platform products are auto-linked — never flag them.
- */
-function productHasNoShopLink(row: ProductFormValues): boolean {
-  if (String(row.sale_channel ?? 'platform') !== 'shop') return false;
-  return productRowHasNoShopLink(row as Record<string, unknown>);
-}
-
 function saleChannelBadge(
   row: ProductFormValues,
   t: TFunction<'table'>
@@ -427,12 +416,6 @@ export const productColumns = (
                 </span>
               );
             })()}
-            {productHasNoShopLink(row.original) && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive">
-                <Iconify icon="solar:danger-triangle-bold" width={12} height={12} />
-                {t('columns.noShopLink')}
-              </span>
-            )}
           </div>
         </div>
       </div>

@@ -21,11 +21,29 @@ export function toOptionalInt(raw: unknown): number | undefined {
   return Math.max(0, Math.floor(n));
 }
 
-/** Discount is an integer 0–100 (percentage and fixed). Empty stays empty. */
-export function toOptionalDiscountInt(raw: unknown): number | undefined {
-  const n = toOptionalInt(raw);
-  if (n == null) return undefined;
-  return Math.min(100, n);
+/**
+ * Discount input: decimals allowed. Percentage is capped at 100.
+ * Fixed is a USD amount and may exceed 100.
+ */
+export function toOptionalDiscount(
+  raw: unknown,
+  discountType?: string | null
+): number | undefined {
+  if (raw === '' || raw === null || raw === undefined) return undefined;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return undefined;
+  const rounded = Math.round(n * 100) / 100;
+  if (discountType === 'percentage') return Math.min(100, rounded);
+  return rounded;
+}
+
+/** Hydrate GET `discount` without flooring or a 100 cap (fixed can be 150.75). */
+export function parseOptionalDiscount(raw: unknown): number | undefined {
+  if (raw === '' || raw === null || raw === undefined) return undefined;
+  if (typeof raw === 'string' && raw.trim() === '') return undefined;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return undefined;
+  return Math.round(n * 100) / 100;
 }
 
 export function toOptionalNumber(raw: unknown): number | undefined {

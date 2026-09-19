@@ -1,5 +1,6 @@
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
+import { getApiErrorMessage } from '@/lib/get-api-error-message';
 import { useQuery } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Iconify } from '@/shared/components/iconify';
@@ -435,8 +436,8 @@ export default function CreatePage() {
         );
         navigate(backListPath);
       }
-    } catch (error: any) {
-      console.error('Error saving shop:', error);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, t('form.shopSaveFailed')));
     }
   };
 
@@ -594,7 +595,7 @@ export default function CreatePage() {
               queryKey={['vendors', 'infinite', 'shop-form']}
               fetcher={vendorFetcher}
               placeholder={t('form.selectVendor')}
-              helperText={t('form.selectVendorHelper')}
+              helperText={t('form.shopVendorOneShopHelper')}
               initialLabel={vendorSelectLabel}
             />
           </Box>

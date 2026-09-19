@@ -6,7 +6,7 @@ import type {
   CategoryAttributeDeleteImpactResponse,
 } from '../types/category-attribute.types';
 
-import { apiRoutes, axiosInstance } from '@/api';
+import { apiRoutes, axiosInstance, postMultipart, putMultipart } from '@/api';
 
 export type { CategoryAttributeCreateUpdatePayload };
 
@@ -22,6 +22,30 @@ export type CategoryAttributeListParams = {
   date_from?: string;
   date_to?: string;
 };
+
+/**
+ * Wire format: `values[0][id]=31` + `values[0][name][ar]=XS`.
+ * Existing rows keep `id` so a rename updates the same DB row.
+ * Omit the `values` key entirely when the caller did not pass it.
+ */
+function buildCategoryAttributeFormData(
+  data: CategoryAttributeCreateUpdatePayload
+): FormData {
+  const formData = new FormData();
+  formData.append('category_id', String(data.category_id));
+  formData.append('type', data.type);
+  formData.append('name[ar]', data.name.ar);
+  formData.append('name[en]', data.name.en);
+  data.values?.forEach((row, index) => {
+    const valueId = Number(row.id);
+    if (Number.isInteger(valueId) && valueId > 0) {
+      formData.append(`values[${index}][id]`, String(valueId));
+    }
+    formData.append(`values[${index}][name][ar]`, row.name.ar);
+    formData.append(`values[${index}][name][en]`, row.name.en);
+  });
+  return formData;
+}
 
 function appendIf(
   target: URLSearchParams,
@@ -87,14 +111,20 @@ export const _CategoryAttributeApi = {
     return response.data;
   },
   createCategoryAttribute: async (data: CategoryAttributeCreateUpdatePayload): Promise<any> => {
-    const response = await axiosInstance.post(apiRoutes.categoryAttribute.create, data);
+    const response = await postMultipart(
+      apiRoutes.categoryAttribute.create,
+      buildCategoryAttributeFormData(data)
+    );
     return response.data;
   },
   updateCategoryAttribute: async (
     id: number | string,
     data: CategoryAttributeCreateUpdatePayload
   ): Promise<any> => {
-    const response = await axiosInstance.put(apiRoutes.categoryAttribute.update(id), data);
+    const response = await putMultipart(
+      apiRoutes.categoryAttribute.update(id),
+      buildCategoryAttributeFormData(data)
+    );
     return response.data;
   },
   /**

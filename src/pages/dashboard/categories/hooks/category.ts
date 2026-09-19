@@ -58,6 +58,31 @@ export const useFetchCategoryById = (id: number | string) => useQuery({
     enabled: !!id,
   });
 
+/** Walk parent_id until the root — category attributes are stored on the root. */
+export const useRootCategoryId = (categoryId?: number) =>
+  useQuery({
+    queryKey: ['category', 'root-of', categoryId ?? 0],
+    enabled: categoryId != null && categoryId > 0,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      let id = Number(categoryId);
+      for (let i = 0; i < 8; i += 1) {
+        const res = await _CategoryApi.getCategoryById(id);
+        const cat = res.data;
+        if (!cat) return id;
+        const isRoot =
+          cat.is_root === true ||
+          cat.parent_id == null ||
+          Number(cat.parent_id) === 0;
+        if (isRoot) return Number(cat.id);
+        const parentId = Number(cat.parent_id ?? cat.parent?.id);
+        if (!Number.isFinite(parentId) || parentId <= 0) return Number(cat.id);
+        id = parentId;
+      }
+      return id;
+    },
+  });
+
 /** Preview of what deleting this category would affect — fetched right before showing the delete dialog. */
 export const useFetchCategoryDeleteImpact = (id: number | string | null) =>
   useQuery({
