@@ -12,6 +12,7 @@ import { normalizeFormattedMoneyText } from '@/utils/format-currency';
 import { createToggleColumn } from '@/shared/ui/table-data/data-table-toggle-cell';
 import { DataTableRowActions } from '@/shared/ui/table-data/data-table-row-actions';
 import { DataTableColumnHeader } from '@/shared/ui/table-data/data-table-column-header';
+
 import { paths } from 'src/routes/paths';
 
 import { CONFIG } from 'src/global-config';

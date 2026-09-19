@@ -16,14 +16,14 @@ import { _ColorApi } from '@/pages/dashboard/colors/api/color.services';
 
 import { Box, Typography } from 'src/shared/ui';
 
-import { ProductVariantInlineRow } from './ProductVariantInlineRow';
 import { isHiddenDefaultVariant } from '../utils/variant-payload';
+import { ProductVariantInlineRow } from './ProductVariantInlineRow';
 import {
   buildColorsHexLookup,
   type ColorsHexLookup,
-  type CategoryAttributePickerRow,
-  type CategoryAttributeValueRef,
   type VariantAttributeRow,
+  type CategoryAttributeValueRef,
+  type CategoryAttributePickerRow,
 } from '../utils/variant-combinations';
 
 // ----------------------------------------------------------------------

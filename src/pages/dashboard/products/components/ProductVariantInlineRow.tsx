@@ -19,17 +19,17 @@ import { VariantImagesField } from './VariantImagesField';
 import { ProductPricingFields } from './ProductPricingFields';
 import { VariantAttributeSelects } from './VariantAttributeSelects';
 import {
-  sortedComboKey,
-  regenerateVariantSku,
-  type ColorsHexLookup,
-  type CategoryAttributeValueRef,
-  type CategoryAttributePickerRow,
-  type VariantAttributeRow,
-} from '../utils/variant-combinations';
-import {
   VariantStatusBadge,
   VariantAttributeChain,
 } from './variant-field-ui';
+import {
+  sortedComboKey,
+  regenerateVariantSku,
+  type ColorsHexLookup,
+  type VariantAttributeRow,
+  type CategoryAttributeValueRef,
+  type CategoryAttributePickerRow,
+} from '../utils/variant-combinations';
 
 export type ProductVariantInlineRowProps = {
   variantIndex: number;

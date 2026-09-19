@@ -31,11 +31,13 @@ import { InfiniteScrollSelect } from '@/shared/components/infinite-scroll-select
 import { _CategoryApi } from '@/pages/dashboard/categories/api/category.services';
 import { useFetchCategoryById } from '@/pages/dashboard/categories/hooks/category';
 import { TinyMCEEditorField } from '@/shared/components/tinymce-editor/tinymce-editor';
+import { useUpdateProductVariant } from '@/pages/dashboard/products/hooks/product-variant';
 import { _SaleCountryApi } from '@/pages/dashboard/sale-countries/api/sale-country.services';
 import { useVariantDeleteFlow } from '@/pages/dashboard/products/hooks/use-variant-delete-flow';
 import { ProductFormExtrasTab } from '@/pages/dashboard/products/components/ProductFormExtrasTab';
 import { ProductPricingFields } from '@/pages/dashboard/products/components/ProductPricingFields';
 import { useFetchCategoryAttributes } from '@/pages/dashboard/categories/hooks/category-attribute';
+import { parseOptionalDiscount } from '@/pages/dashboard/products/components/variant-field-helpers';
 import { useFetchProductExtraDetails } from '@/pages/dashboard/categories/hooks/product-extra-detail';
 import { ProductVariantsCardList } from '@/pages/dashboard/products/components/ProductVariantsCardList';
 import { VariantDeleteImpactDialog } from '@/pages/dashboard/products/components/VariantDeleteImpactDialog';
@@ -46,18 +48,10 @@ import {
   type ProductFormValues,
 } from '@/pages/dashboard/products/validation/product.validation';
 import {
-  sortedComboKey,
-  resolveAttributeValuesByIds,
-  mergeVariantAttributeValueIds,
-  toCategoryAttributePickerRows,
-  ensureCategoryAttributesFromVariants,
-} from '@/pages/dashboard/products/utils/variant-combinations';
-import {
   useCreateProduct,
   useUpdateProduct,
   useFetchProductById,
 } from '@/pages/dashboard/products/hooks/product';
-import { useUpdateProductVariant } from '@/pages/dashboard/products/hooks/product-variant';
 import {
   VariantGeneratorPanel,
   type GeneratedVariantRow,
@@ -69,7 +63,13 @@ import {
   variantExistingImageFormState,
   extractVariantAttributeValueIds,
 } from '@/pages/dashboard/products/utils/variant-payload';
-import { parseOptionalDiscount } from '@/pages/dashboard/products/components/variant-field-helpers';
+import {
+  sortedComboKey,
+  resolveAttributeValuesByIds,
+  mergeVariantAttributeValueIds,
+  toCategoryAttributePickerRows,
+  ensureCategoryAttributesFromVariants,
+} from '@/pages/dashboard/products/utils/variant-combinations';
 
 import { paths } from 'src/routes/paths';
 

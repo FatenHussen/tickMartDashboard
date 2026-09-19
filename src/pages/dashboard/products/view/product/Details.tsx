@@ -15,31 +15,31 @@ import { formatTranslated } from '@/utils/format-translated';
 import { getApiErrorMessage } from '@/lib/get-api-error-message';
 import { iconArtworkSrc } from '@/pages/dashboard/icons/utils/icon-artwork';
 import { useFetchProductById } from '@/pages/dashboard/products/hooks/product';
-import { useFetchCurrencies } from '@/pages/dashboard/currencies/hooks/currency';
 import { useRootCategoryId } from '@/pages/dashboard/categories/hooks/category';
-import { VariantAttributeSelects } from '@/pages/dashboard/products/components/VariantAttributeSelects';
-import { useFetchCategoryAttributes } from '@/pages/dashboard/categories/hooks/category-attribute';
-import {
-  priceAfterDiscount,
-  attributeValueLabel,
-  generateRandomVariantSku,
-  sanitizeEnglishSkuInput,
-  resolveAttributeValueId,
-  mergeVariantAttributeValueIds,
-  toCategoryAttributePickerRows,
-  ensureCategoryAttributesFromVariants,
-  type CategoryAttributePickerRow,
-} from '@/pages/dashboard/products/utils/variant-combinations';
+import { useFetchCurrencies } from '@/pages/dashboard/currencies/hooks/currency';
+import { useUpdateProductVariant } from '@/pages/dashboard/products/hooks/product-variant';
 import { useVariantDeleteFlow } from '@/pages/dashboard/products/hooks/use-variant-delete-flow';
+import { useFetchCategoryAttributes } from '@/pages/dashboard/categories/hooks/category-attribute';
+import { VariantAttributeSelects } from '@/pages/dashboard/products/components/VariantAttributeSelects';
 import { VariantDeleteImpactDialog } from '@/pages/dashboard/products/components/VariantDeleteImpactDialog';
 import { formatDecimal, normalizeFormattedMoneyText, formatApiCurrencyAmountForLanguage } from '@/utils/format-currency';
-import { useUpdateProductVariant } from '@/pages/dashboard/products/hooks/product-variant';
 import {
   isHiddenDefaultVariant,
   variantImageFieldsFromRow,
   normalizeVariantExistingImages,
   extractVariantAttributeValueIds,
 } from '@/pages/dashboard/products/utils/variant-payload';
+import {
+  priceAfterDiscount,
+  attributeValueLabel,
+  sanitizeEnglishSkuInput,
+  resolveAttributeValueId,
+  generateRandomVariantSku,
+  mergeVariantAttributeValueIds,
+  toCategoryAttributePickerRows,
+  type CategoryAttributePickerRow,
+  ensureCategoryAttributesFromVariants,
+} from '@/pages/dashboard/products/utils/variant-combinations';
 import {
   ProductDetailsTag,
   ProductDetailsChip,
