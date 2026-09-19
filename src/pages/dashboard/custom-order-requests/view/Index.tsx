@@ -48,7 +48,7 @@ export default function Page() {
     search: search.trim() || undefined,
   });
 
-  const rawItems = response?.data?.items ?? [];
+  const rawItems = Array.isArray(response?.data?.items) ? response.data.items : [];
   const apiPagination = response?.data?.pagination;
   const pagination = apiPagination
     ? {
@@ -156,6 +156,15 @@ export default function Page() {
         }}
         onSearchChange={setSearch}
         searchPlaceholder={t('form.customOrderRequestSearchPlaceholder')}
+        columnTranslations={{
+          id: t('columns.id'),
+          user_name: t('columns.user'),
+          description: t('form.customOrderRequestCustomerText'),
+          address_label: t('columns.address'),
+          status_label: t('columns.status'),
+          payment_method_name: t('columns.paymentMethod'),
+          created_at: t('columns.createdAt'),
+        }}
       />
     </>
   );

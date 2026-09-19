@@ -2,15 +2,19 @@ import type { NotificationItemProps } from './notification-item';
 
 import { m } from 'framer-motion';
 import { queryKeys } from '@/api';
+import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { useBoolean } from 'minimal-shared/hooks';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 
+import { fToNow } from 'src/utils/format-time';
+
 import { Label } from 'src/shared/components/label';
 import { Iconify } from 'src/shared/components/iconify';
 import { Scrollbar } from 'src/shared/components/scrollbar';
 import { CustomTabs } from 'src/shared/components/custom-tabs';
+import { useLocalizationStore } from 'src/store/useLocalizationStore';
 import { varTap, varHover, transitionTap } from 'src/shared/components/animate';
 import { Box, Tab, Badge, Drawer, Button, Tooltip, Typography, IconButton } from 'src/shared/ui';
 
@@ -30,7 +34,28 @@ function mapApiToNotification(
     isUnRead: item.read_at === null,
     avatarUrl: null,
     createdAt: item.created_at,
+    url: item.url,
   };
+}
+
+function resolveNotificationPath(url: string): string | null {
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    try {
+      const parsed = new URL(trimmed);
+      if (parsed.origin === window.location.origin) {
+        return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+      }
+    } catch {
+      return null;
+    }
+    window.location.assign(trimmed);
+    return null;
+  }
+
+  return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 }
 
 // ----------------------------------------------------------------------
@@ -41,21 +66,29 @@ export type NotificationsDrawerProps = React.ButtonHTMLAttributes<HTMLButtonElem
 
 export function NotificationsDrawer({ data = [], className, ...other }: NotificationsDrawerProps) {
   const { t } = useTranslation('common');
+  const navigate = useNavigate();
+  const direction = useLocalizationStore((s) => s.direction);
   const { value: open, onFalse: onClose, onTrue: onOpen } = useBoolean();
 
   const [currentTab, setCurrentTab] = useState('all');
-  const [localNotifications, setLocalNotifications] = useState<NotificationItemProps['notification'][] | null>(null);
+  const [selectedNotification, setSelectedNotification] = useState<
+    NotificationItemProps['notification'] | null
+  >(null);
+  const [localNotifications, setLocalNotifications] = useState<
+    NotificationItemProps['notification'][] | null
+  >(null);
 
-  const { data: apiResponse, isLoading, refetch } = useQuery({
+  const { data: apiResponse, isLoading, isError, refetch } = useQuery({
     queryKey: queryKeys.auth.notifications(),
     queryFn: () => _NotificationApi.getList(),
   });
 
-  // Refetch notifications when drawer opens to get latest data
   useEffect(() => {
     if (open) {
       refetch();
+      return;
     }
+    setSelectedNotification(null);
   }, [open, refetch]);
 
   const notifications = useMemo(() => {
@@ -92,8 +125,48 @@ export function NotificationsDrawer({ data = [], className, ...other }: Notifica
     );
   };
 
+  const markRead = useCallback((notification: NotificationItemProps['notification']) => {
+    setLocalNotifications((current) =>
+      (current ?? notifications).map((item) =>
+        item.id === notification.id ? { ...item, isUnRead: false } : item
+      )
+    );
+  }, [notifications]);
+
+  const followNotificationLink = useCallback(
+    (notification: NotificationItemProps['notification']) => {
+      if (!notification.url) return;
+      const path = resolveNotificationPath(notification.url);
+      if (path) {
+        onClose();
+        setSelectedNotification(null);
+        navigate(path);
+      }
+    },
+    [navigate, onClose]
+  );
+
+  const handleOpenNotification = useCallback(
+    (notification: NotificationItemProps['notification']) => {
+      markRead(notification);
+      setSelectedNotification(notification);
+    },
+    [markRead]
+  );
+
+  const handleBellClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (open) {
+      setSelectedNotification(null);
+      onClose();
+      return;
+    }
+    onOpen();
+  };
+
   const renderHead = () => (
-    <Box className="py-2 pe-1 ps-2.5 min-h-[68px] flex items-center">
+    <Box className="py-2 pe-1 ps-2.5 min-h-[68px] flex items-center shrink-0">
       <Typography variant="h6" className="flex-grow">
         {t('notificationsDrawerTitle')}
       </Typography>
@@ -106,12 +179,13 @@ export function NotificationsDrawer({ data = [], className, ...other }: Notifica
         </Tooltip>
       )}
 
-      <IconButton onClick={onClose} className="inline-flex sm:hidden">
+      <IconButton
+        onClick={() => {
+          setSelectedNotification(null);
+          onClose();
+        }}
+      >
         <Iconify icon="mingcute:close-line" />
-      </IconButton>
-
-      <IconButton>
-        <Iconify icon="solar:settings-bold-duotone" />
       </IconButton>
     </Box>
   );
@@ -141,12 +215,65 @@ export function NotificationsDrawer({ data = [], className, ...other }: Notifica
     </CustomTabs>
   );
 
+  const renderDetail = (notification: NotificationItemProps['notification']) => {
+    const formattedTime =
+      notification.createdAt == null ? '' : fToNow(notification.createdAt);
+    const timeLabel = formattedTime === 'Invalid date' ? String(notification.createdAt) : formattedTime;
+    const body = notification.category;
+
+    return (
+      <Box className="flex min-h-0 flex-1 flex-col">
+        <Box className="shrink-0 px-3 pt-2">
+          <Button
+            type="button"
+            variant="text"
+            size="small"
+            onClick={() => setSelectedNotification(null)}
+          >
+            <Iconify icon="solar:arrow-left-line-duotone" width={18} className="me-1" />
+            {t('notificationDetailBack')}
+          </Button>
+        </Box>
+        <Scrollbar className="flex-1 min-h-0">
+          <Box className="space-y-3 px-4 py-3">
+            <Typography variant="subtitle1" className="font-semibold text-foreground">
+              {notification.title || '—'}
+            </Typography>
+            {timeLabel ? (
+              <Typography variant="caption" className="block text-muted-foreground">
+                {timeLabel}
+              </Typography>
+            ) : null}
+            {body ? (
+              <Typography variant="body2" className="whitespace-pre-wrap text-foreground">
+                {body}
+              </Typography>
+            ) : null}
+            {notification.url ? (
+              <Button
+                type="button"
+                variant="contained"
+                onClick={() => followNotificationLink(notification)}
+              >
+                {t('notificationOpenLink')}
+              </Button>
+            ) : null}
+          </Box>
+        </Scrollbar>
+      </Box>
+    );
+  };
+
   const renderList = () => (
-    <Scrollbar>
+    <Scrollbar className="flex-1 min-h-0">
       <Box component="ul">
         {isLoading ? (
           <Box className="flex justify-center py-8">
             <Iconify icon="svg-spinners:ring-resize" width={32} className="text-muted-foreground" />
+          </Box>
+        ) : isError ? (
+          <Box className="flex justify-center py-8 text-sm text-destructive">
+            {t('genericError')}
           </Box>
         ) : filteredNotifications.length === 0 ? (
           <Box className="flex justify-center py-8 text-sm text-muted-foreground">
@@ -155,7 +282,11 @@ export function NotificationsDrawer({ data = [], className, ...other }: Notifica
         ) : (
           filteredNotifications.map((notification) => (
             <Box component="li" key={notification.id} className="flex">
-              <NotificationItem notification={notification} />
+              <NotificationItem
+                notification={notification}
+                onOpen={handleOpenNotification}
+                onOpenLink={followNotificationLink}
+              />
             </Box>
           ))
         )}
@@ -166,15 +297,17 @@ export function NotificationsDrawer({ data = [], className, ...other }: Notifica
   return (
     <>
       <m.button
+        type="button"
         whileTap={varTap(0.96)}
         whileHover={varHover(1.04)}
         transition={transitionTap()}
         aria-label={t('notificationsButton')}
-        onClick={onOpen}
+        aria-expanded={open}
         className={`inline-flex items-center justify-center rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 w-9 text-foreground hover:bg-muted active:bg-muted ${className || ''}`}
         {...(other as any)}
+        onClick={handleBellClick}
       >
-        <Badge badgeContent={totalUnRead} color="error">
+        <Badge badgeContent={totalUnRead} color="error" invisible={totalUnRead === 0}>
           <Iconify width={24} icon="solar:bell-bing-bold-duotone" />
         </Badge>
       </m.button>
@@ -182,21 +315,33 @@ export function NotificationsDrawer({ data = [], className, ...other }: Notifica
       <Drawer
         open={open}
         onClose={onClose}
-        anchor="right"
-        slotProps={{
-          backdrop: { invisible: true },
-        }}
-        className="w-full max-w-[420px]"
+        anchor={direction === 'rtl' ? 'left' : 'right'}
+        width="420px"
+        className="flex h-full flex-col overflow-hidden border-s border-border"
       >
         {renderHead()}
-        {renderTabs()}
-        {renderList()}
+        {selectedNotification ? (
+          renderDetail(selectedNotification)
+        ) : (
+          <>
+            {renderTabs()}
+            {renderList()}
+          </>
+        )}
 
-        <Box className="p-1">
-          <Button fullWidth size="large">
-            View all
-          </Button>
-        </Box>
+        {selectedNotification ? null : (
+          <Box className="p-2 shrink-0">
+            <Button
+              fullWidth
+              size="large"
+              onClick={() => {
+                setCurrentTab('all');
+              }}
+            >
+              {t('viewAll')}
+            </Button>
+          </Box>
+        )}
       </Drawer>
     </>
   );

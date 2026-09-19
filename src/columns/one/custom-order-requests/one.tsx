@@ -6,7 +6,16 @@ import { z } from 'zod';
 import { TableTonedStatusPill } from '@/shared/components/table-status-badges';
 import { DataTableRowActions } from '@/shared/ui/table-data/data-table-row-actions';
 import { DataTableColumnHeader } from '@/shared/ui/table-data/data-table-column-header';
-import { getCustomOrderRequestText } from '@/pages/dashboard/custom-order-requests/utils/display';
+import {
+  getCustomOrderRequestText,
+  getCustomOrderRequestAddress,
+  getCustomOrderRequestUserName,
+  getCustomOrderRequestUserPhone,
+  getCustomOrderRequestCreatedAt,
+  getCustomOrderRequestStatusKey,
+  getCustomOrderRequestStatusLabel,
+  getCustomOrderRequestPaymentMethodLabel,
+} from '@/pages/dashboard/custom-order-requests/utils/display';
 
 const CustomOrderRequestSchema = z.object({
   id: z.number(),
@@ -25,7 +34,7 @@ const statusPill: Record<string, { icon: string; className: string }> = {
   converted: { icon: 'solar:transfer-horizontal-bold', className: 'border-violet-800 bg-violet-600' },
 };
 
-function statusLabel(t: TFunction<'table'>, status: string): string {
+function fallbackStatusLabel(t: TFunction<'table'>, status: string): string {
   return t(`form.customOrderRequestStatus_${status}`, { defaultValue: status });
 }
 
@@ -40,26 +49,24 @@ export const customOrderRequestColumns = (
     cell: ({ row }) => <span className="font-mono text-sm">#{row.original.id}</span>,
   },
   {
-    id: 'user',
-    accessorKey: 'user',
+    id: 'user_name',
+    accessorFn: (row) => getCustomOrderRequestUserName(row),
     header: ({ column }) => <DataTableColumnHeader column={column} title={t('columns.user')} />,
-    cell: ({ row }) => (
-      <div>
-        <span className="font-semibold text-foreground">{row.original.user?.name || '—'}</span>
-        {row.original.user?.phone && (
-          <>
-            <br />
-            <span className="text-xs text-muted-foreground">{row.original.user.phone}</span>
-          </>
-        )}
-        {row.original.user?.email && (
-          <>
-            <br />
-            <span className="text-xs text-muted-foreground">{row.original.user.email}</span>
-          </>
-        )}
-      </div>
-    ),
+    cell: ({ row }) => {
+      const name = getCustomOrderRequestUserName(row.original);
+      const phone = getCustomOrderRequestUserPhone(row.original);
+      return (
+        <div>
+          <span className="font-semibold text-foreground">{name}</span>
+          {phone ? (
+            <>
+              <br />
+              <span className="text-xs text-muted-foreground">{phone}</span>
+            </>
+          ) : null}
+        </div>
+      );
+    },
   },
   {
     id: 'description',
@@ -77,40 +84,58 @@ export const customOrderRequestColumns = (
     },
   },
   {
-    id: 'status',
-    accessorKey: 'status',
+    id: 'address_label',
+    accessorFn: (row) => getCustomOrderRequestAddress(row),
+    header: ({ column }) => <DataTableColumnHeader column={column} title={t('columns.address')} />,
+    cell: ({ row }) => {
+      const address = getCustomOrderRequestAddress(row.original);
+      return (
+        <span className="line-clamp-2 max-w-[240px] text-sm text-muted-foreground" title={address}>
+          {address}
+        </span>
+      );
+    },
+  },
+  {
+    id: 'status_label',
+    accessorFn: (row) => getCustomOrderRequestStatusLabel(row),
     header: ({ column }) => <DataTableColumnHeader column={column} title={t('columns.status')} />,
     cell: ({ row }) => {
-      const key = String(row.original.status);
+      const key = getCustomOrderRequestStatusKey(row.original);
+      const label = getCustomOrderRequestStatusLabel(row.original, fallbackStatusLabel(t, key));
       const cfg = statusPill[key] ?? {
         icon: 'solar:info-circle-bold',
         className: 'border-slate-600 bg-slate-500',
       };
       return (
         <TableTonedStatusPill icon={cfg.icon} className={cfg.className}>
-          {statusLabel(t, key)}
+          {label}
         </TableTonedStatusPill>
       );
     },
   },
   {
-    id: 'payment_method',
-    accessorKey: 'payment_method',
+    id: 'payment_method_name',
+    accessorFn: (row) => getCustomOrderRequestPaymentMethodLabel(row),
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title={t('columns.paymentMethod')} />
     ),
     cell: ({ row }) => (
-      <span className="text-sm text-muted-foreground">{row.original.payment_method || '—'}</span>
+      <span className="text-sm text-muted-foreground">
+        {getCustomOrderRequestPaymentMethodLabel(row.original)}
+      </span>
     ),
   },
   {
     id: 'created_at',
-    accessorKey: 'created_at',
+    accessorFn: (row) => getCustomOrderRequestCreatedAt(row),
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title={t('columns.createdAt')} />
     ),
     cell: ({ row }) => (
-      <span className="text-sm text-muted-foreground">{row.original.created_at || '—'}</span>
+      <span className="text-sm text-muted-foreground">
+        {getCustomOrderRequestCreatedAt(row.original)}
+      </span>
     ),
   },
   {

@@ -12,6 +12,7 @@ export function ListItemButton({
 }: ListItemButtonProps) {
   return (
     <button
+      type="button"
       className={mergeClasses([
         'w-full text-left p-2.5 rounded-lg transition-colors',
         'hover:bg-muted',

@@ -14,10 +14,17 @@ import {
 } from '@/pages/dashboard/custom-order-requests/hooks/custom-order-request';
 import {
   getLinkedOrderId,
+  customOrderDisplayText,
   getCustomOrderRequestText,
   getCustomOrderRequestAddress,
+  getCustomOrderRequestUserName,
+  getCustomOrderRequestUserPhone,
   getCustomOrderRequestImageUrls,
+  getCustomOrderRequestCreatedAt,
+  getCustomOrderRequestStatusKey,
+  getCustomOrderRequestStatusLabel,
   getCustomOrderRequestExpectedTime,
+  getCustomOrderRequestPaymentMethodLabel,
 } from '@/pages/dashboard/custom-order-requests/utils/display';
 
 import { CONFIG } from 'src/global-config';
@@ -66,7 +73,7 @@ export default function DetailsPage() {
     );
   }
 
-  const status = String(item.status);
+  const status = getCustomOrderRequestStatusKey(item);
   const isPendingPricing = status === 'pending_pricing';
   const canCancelStatus = status === 'pending_pricing' || status === 'waiting_approval';
   const customerText = getCustomOrderRequestText(item);
@@ -159,17 +166,24 @@ export default function DetailsPage() {
                 <span
                   className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusClass}`}
                 >
-                  {t(`form.customOrderRequestStatus_${status}`, { defaultValue: status })}
+                  {getCustomOrderRequestStatusLabel(
+                    item,
+                    t(`form.customOrderRequestStatus_${status}`, { defaultValue: status })
+                  )}
                 </span>
               </Box>
               <Typography variant="body2" className="text-muted-foreground">
-                {item.user?.name || '—'}
-                {item.user?.phone ? ` · ${item.user.phone}` : ''}
-                {item.user?.email ? ` · ${item.user.email}` : ''}
+                {[
+                  getCustomOrderRequestUserName(item),
+                  getCustomOrderRequestUserPhone(item),
+                  customOrderDisplayText(item.user?.email),
+                ]
+                  .filter((part) => part && part !== '—')
+                  .join(' · ')}
               </Typography>
-              {item.created_at && (
+              {getCustomOrderRequestCreatedAt(item) !== '—' && (
                 <Typography variant="caption" className="mt-1 block text-muted-foreground">
-                  {item.created_at}
+                  {getCustomOrderRequestCreatedAt(item)}
                 </Typography>
               )}
             </Box>
@@ -254,7 +268,7 @@ export default function DetailsPage() {
                     {t('form.customOrderRequestRejectionReason')}
                   </Typography>
                   <Typography variant="body2" className="mt-1">
-                    {item.rejection_reason}
+                    {customOrderDisplayText(item.rejection_reason) || '—'}
                   </Typography>
                 </Box>
               )}
@@ -264,7 +278,7 @@ export default function DetailsPage() {
                     {t('form.customOrderRequestAdminNote')}
                   </Typography>
                   <Typography variant="body2" className="mt-1">
-                    {item.admin_note}
+                    {customOrderDisplayText(item.admin_note) || '—'}
                   </Typography>
                 </Box>
               )}
@@ -288,7 +302,7 @@ export default function DetailsPage() {
                 <FieldRow label={t('form.customOrderRequestExpectedTime')} value={expectedTime} />
                 <FieldRow
                   label={t('columns.paymentMethod')}
-                  value={item.payment_method || '—'}
+                  value={getCustomOrderRequestPaymentMethodLabel(item)}
                 />
               </Box>
 

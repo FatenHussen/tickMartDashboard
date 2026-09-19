@@ -5296,6 +5296,8 @@
     "markAllRead": "تحديد الكل كمقروء",
     "notificationsEmpty": "لا توجد إشعارات",
     "notificationsButton": "الإشعارات",
+    "notificationDetailBack": "رجوع للقائمة",
+    "notificationOpenLink": "فتح",
     "viewAll": "عرض الكل",
     "settingsButtonAria": "الإعدادات",
     "signUpAgreePrefix": "بالتسجيل، فإنك توافق على",
@@ -5307,6 +5309,8 @@
     "noPageAccess": "ليس لديك صلاحية الوصول إلى هذه الصفحة.",
     "goToDashboard": "اذهب إلى لوحة التحكم",
     "page404DocumentTitle": "الصفحة غير موجودة",
-    "logoAria": "الشعار"
+    "logoAria": "الشعار",
+    "errorUnexpectedTitle": "خطأ غير متوقع",
+    "errorUnknownTitle": "خطأ غير معروف"
   }
 }

@@ -25,15 +25,24 @@ export type NotificationItemProps = {
     isUnRead: boolean;
     avatarUrl: string | null;
     createdAt: string | number | null;
+    url?: string | null;
   };
+  onOpen?: (notification: NotificationItemProps['notification']) => void;
+  onOpenLink?: (notification: NotificationItemProps['notification']) => void;
 };
 
-const readerContent = (data: string) => (
-  <Box
-    dangerouslySetInnerHTML={{ __html: data }}
-    className="[&_p]:m-0 [&_p]:text-sm [&_a]:text-inherit [&_a]:no-underline [&_strong]:text-sm [&_strong]:font-medium"
-  />
-);
+const readerContent = (data: string) => {
+  if (!data) return null;
+  if (data.includes('<') && data.includes('>')) {
+    return (
+      <Box
+        dangerouslySetInnerHTML={{ __html: data }}
+        className="[&_p]:m-0 [&_p]:text-sm [&_a]:text-inherit [&_a]:no-underline [&_strong]:text-sm [&_strong]:font-medium"
+      />
+    );
+  }
+  return <Box className="text-sm font-medium text-foreground">{data}</Box>;
+};
 
 const renderIcon = (type: string) =>
   ({
@@ -43,7 +52,7 @@ const renderIcon = (type: string) =>
     delivery: notificationIcons.delivery,
   })[type];
 
-export function NotificationItem({ notification }: NotificationItemProps) {
+export function NotificationItem({ notification, onOpen, onOpenLink }: NotificationItemProps) {
   const renderAvatar = () => (
     <ListItemAvatar>
       {notification.avatarUrl ? (
@@ -165,7 +174,15 @@ export function NotificationItem({ notification }: NotificationItemProps) {
   );
 
   return (
-    <ListItemButton className="p-2.5 items-start border-b border-dashed border-border relative">
+    <ListItemButton
+      type="button"
+      className="p-2.5 items-start border-b border-dashed border-border relative w-full"
+      onClick={() => onOpen?.(notification)}
+      onDoubleClick={() => {
+        onOpen?.(notification);
+        if (notification.url) onOpenLink?.(notification);
+      }}
+    >
       {renderUnReadBadge()}
       {renderAvatar()}
 

@@ -78,7 +78,10 @@ function renderErrorMessage(error: any) {
     return (
       <>
         <h1 className={errorBoundaryClasses.title}>
-          {i18n.t('errorUnexpectedTitle', { ns: 'common' })}
+          {i18n.t('errorUnexpectedTitle', {
+            ns: 'common',
+            defaultValue: 'Unexpected error',
+          })}
         </h1>
         <p className={errorBoundaryClasses.message}>
           {error.name}: {error.message}
@@ -94,7 +97,9 @@ function renderErrorMessage(error: any) {
   }
 
   return (
-    <h1 className={errorBoundaryClasses.title}>{i18n.t('errorUnknownTitle', { ns: 'common' })}</h1>
+    <h1 className={errorBoundaryClasses.title}>
+      {i18n.t('errorUnknownTitle', { ns: 'common', defaultValue: 'Unknown error' })}
+    </h1>
   );
 }
 

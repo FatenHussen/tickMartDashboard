@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { mergeClasses } from 'minimal-shared/utils';
 
@@ -36,6 +36,16 @@ export function Drawer({
   disableEscapeKeyDown,
   slotProps,
 }: DrawerProps) {
+  const ignoreBackdropUntilRef = useRef(0);
+
+  useEffect(() => {
+    if (open) {
+      // The opening click (or the second click of a double-click) would otherwise
+      // hit this overlay and close the drawer immediately.
+      ignoreBackdropUntilRef.current = Date.now() + 400;
+    }
+  }, [open]);
+
   useEffect(() => {
     if (!open || disableEscapeKeyDown) {
       return undefined;
@@ -67,10 +77,16 @@ export function Drawer({
   const isVertical = anchor === 'left' || anchor === 'right';
   const drawerStyle = isVertical ? { width } : { height: width };
 
+  const handleBackdropClick = () => {
+    if (!onClose || disableBackdropClick) return;
+    if (Date.now() < ignoreBackdropUntilRef.current) return;
+    onClose();
+  };
+
   const content = (
     <div
-      className="fixed inset-0 z-[var(--layout-modal-zIndex)]"
-      onClick={!disableBackdropClick && onClose ? onClose : undefined}
+      className="fixed inset-0 z-[var(--layout-modal-zIndex,1300)]"
+      onClick={handleBackdropClick}
     >
       {!slotProps?.backdrop?.invisible && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity" aria-hidden="true" />

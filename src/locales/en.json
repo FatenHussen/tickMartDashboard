@@ -5279,6 +5279,8 @@
     "markAllRead": "Mark all as read",
     "notificationsEmpty": "No notifications",
     "notificationsButton": "Notifications",
+    "notificationDetailBack": "Back to list",
+    "notificationOpenLink": "Open",
     "viewAll": "View all",
     "settingsButtonAria": "Settings",
     "signUpAgreePrefix": "By signing up, you agree to our",
@@ -5290,6 +5292,8 @@
     "noPageAccess": "You don't have access to this page.",
     "goToDashboard": "Go to dashboard",
     "page404DocumentTitle": "Page not found",
-    "logoAria": "Logo"
+    "logoAria": "Logo",
+    "errorUnexpectedTitle": "Unexpected error",
+    "errorUnknownTitle": "Unknown error"
   }
 }

@@ -15,24 +15,36 @@ export const CUSTOM_ORDER_REQUEST_STATUS_OPTIONS: CustomOrderRequestStatus[] = [
   'converted',
 ];
 
+export type CustomOrderLocalizedName = string | { ar?: string; en?: string } | null;
+
+export interface CustomOrderRequestPaymentMethod {
+  id?: number;
+  name?: CustomOrderLocalizedName;
+  code?: string | null;
+  icon?: string | null;
+}
+
 export interface CustomOrderRequestUser {
   id: number;
-  name: string;
+  name?: CustomOrderLocalizedName;
   email?: string;
   phone?: string;
 }
 
 export interface CustomOrderRequestAddress {
   id?: number;
+  label?: CustomOrderLocalizedName;
+  street_name?: string | null;
+  street?: string | null;
+  /** String or `{ ar, en }` — never render the object itself. */
+  area?: CustomOrderLocalizedName | { id?: number; name?: CustomOrderLocalizedName };
   full_address?: string;
   address?: string;
-  street?: string;
   building?: string;
   floor?: string;
   notes?: string;
   lat?: number | string;
   lng?: number | string;
-  [key: string]: unknown;
 }
 
 export interface CustomOrderRequestImage {
@@ -47,6 +59,7 @@ export interface CustomOrderRequestListItem {
   user?: CustomOrderRequestUser | null;
   user_id?: number;
   status: CustomOrderRequestStatus | string;
+  status_label?: string | null;
   /** Customer free-text request */
   description?: string | null;
   note?: string | null;
@@ -58,7 +71,7 @@ export interface CustomOrderRequestListItem {
   expected_delivery_time?: string | null;
   expected_at?: string | null;
   delivery_time?: string | null;
-  payment_method?: string | null;
+  payment_method?: string | CustomOrderRequestPaymentMethod | null;
   approximate_total?: number | string | null;
   delivery_price?: number | string | null;
   order_id?: number | null;
