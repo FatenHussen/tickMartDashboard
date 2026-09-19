@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type {
   ConvertItemInput,
   ConvertCatalogItem,
@@ -51,8 +52,7 @@ export function ConvertCustomOrderForm({ onSubmit, isSubmitting }: Props) {
   const itemsSubtotal = useMemo(
     () =>
       items.reduce((sum, item) => {
-        const unit =
-          item.type === 'catalog' ? Number(item.unit_price ?? 0) : Number(item.unit_price ?? 0);
+        const unit = Number(item.unit_price ?? 0);
         return sum + unit * Number(item.quantity || 0);
       }, 0),
     [items]
@@ -185,288 +185,283 @@ export function ConvertCustomOrderForm({ onSubmit, isSubmitting }: Props) {
     _ShopProductVariantApi.getList({ page, per_page: limit });
 
   return (
-    <Box className="space-y-5">
-      <Box className="flex flex-wrap items-center justify-between gap-2">
-        <Typography variant="subtitle2" className="font-semibold">
-          {t('form.customOrderRequestBuildItems')}
-        </Typography>
-        <Box className="flex flex-wrap gap-2">
-          <Button type="button" variant="outlined" size="small" onClick={addCatalogItem}>
-            <Iconify icon="solar:box-bold" width={16} className="me-1" />
-            {t('form.customOrderRequestAddCatalog')}
-          </Button>
-          <Button type="button" variant="outlined" size="small" onClick={addExternalItem}>
-            <Iconify icon="solar:bag-cross-bold" width={16} className="me-1" />
-            {t('form.customOrderRequestAddExternal')}
-          </Button>
-        </Box>
-      </Box>
+    <Box className="space-y-6">
+      <Typography variant="body2" className="leading-relaxed text-muted-foreground">
+        {t('form.customOrderRequestQuoteHint')}
+      </Typography>
 
-      {items.length === 0 && (
-        <Box className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-8 text-center">
-          <Typography variant="body2" className="text-muted-foreground">
-            {t('form.customOrderRequestNoItemsYet')}
+      {items.length === 0 ? (
+        <Box className="space-y-3">
+          <Typography variant="subtitle2" className="font-semibold text-foreground">
+            {t('form.customOrderRequestEmptyTitle')}
           </Typography>
+          <Box className="grid gap-3 sm:grid-cols-2">
+            <ChoiceCard
+              icon="solar:shop-bold"
+              title={t('form.customOrderRequestAddCatalog')}
+              hint={t('form.customOrderRequestAddCatalogHint')}
+              onClick={addCatalogItem}
+            />
+            <ChoiceCard
+              icon="solar:cart-large-4-bold"
+              title={t('form.customOrderRequestAddExternal')}
+              hint={t('form.customOrderRequestAddExternalHint')}
+              onClick={addExternalItem}
+            />
+          </Box>
+        </Box>
+      ) : (
+        <Box className="space-y-3">
+          <Box className="flex flex-wrap items-center justify-between gap-2">
+            <Typography variant="subtitle2" className="font-semibold">
+              {t('form.customOrderRequestItemsHeading')}
+              <span className="ms-2 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                {items.length}
+              </span>
+            </Typography>
+            <Box className="flex flex-wrap gap-2">
+              <Button type="button" variant="outlined" size="small" onClick={addCatalogItem}>
+                <Iconify icon="solar:shop-bold" width={16} className="me-1" />
+                {t('form.customOrderRequestAddCatalog')}
+              </Button>
+              <Button type="button" variant="outlined" size="small" onClick={addExternalItem}>
+                <Iconify icon="solar:cart-large-4-bold" width={16} className="me-1" />
+                {t('form.customOrderRequestAddExternal')}
+              </Button>
+            </Box>
+          </Box>
+
+          {items.map((item, index) => (
+            <Box
+              key={item.localId}
+              className="space-y-3 rounded-xl border border-border/60 bg-background/80 p-4"
+            >
+              <Box className="flex items-center justify-between gap-2">
+                <Box className="flex items-center gap-2">
+                  <span className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-xs font-semibold text-primary">
+                    {index + 1}
+                  </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      item.type === 'catalog'
+                        ? 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300'
+                        : 'bg-amber-500/15 text-amber-900 dark:text-amber-300'
+                    }`}
+                  >
+                    {item.type === 'catalog'
+                      ? t('form.customOrderRequestTypeCatalog')
+                      : t('form.customOrderRequestTypeExternal')}
+                  </span>
+                </Box>
+                <button
+                  type="button"
+                  onClick={() => removeItem(item.localId)}
+                  className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  aria-label={t('form.remove')}
+                >
+                  <Iconify icon="solar:trash-bin-trash-bold" width={18} />
+                </button>
+              </Box>
+
+              {item.type === 'catalog' ? (
+                <>
+                  <Field label={t('form.customOrderRequestVariant')}>
+                    <InfiniteScrollSelect
+                      value={item.shop_product_variant_id || 0}
+                      onChange={(variantId) => {
+                        const id = Number(variantId) || 0;
+                        const cached = queryClient.getQueryData(VARIANT_SELECT_QUERY_KEY) as
+                          | { pages?: Array<{ data?: { items?: ShopProductVariantItem[] } }> }
+                          | undefined;
+                        const option = cached?.pages
+                          ?.flatMap((p) => p?.data?.items ?? [])
+                          .find((row) => Number(row.id) === id);
+                        const sale = option ? resolveShopVariantSaleFields(option) : {};
+                        const after = sale.price_after_discount;
+                        const unit =
+                          after != null && Number(after) > 0
+                            ? Number(after)
+                            : Number(sale.price ?? 0);
+                        updateItem(item.localId, {
+                          shop_product_variant_id: id,
+                          unit_price: unit,
+                          label: option?.label ?? '',
+                        });
+                      }}
+                      queryKey={[...VARIANT_SELECT_QUERY_KEY]}
+                      fetcher={variantFetcher}
+                      placeholder={t('form.customOrderRequestSelectVariant')}
+                      getOptionImage={(opt) => shopVariantOptionImage(opt)}
+                      getOptionColorHex={(opt) => shopVariantOptionColorHex(opt)}
+                    />
+                  </Field>
+                  <Box className="grid grid-cols-2 gap-3">
+                    <Field label={t('columns.quantity')}>
+                      <input
+                        type="number"
+                        min={1}
+                        className={fieldInputClass}
+                        value={item.quantity || ''}
+                        onChange={(e) =>
+                          updateItem(item.localId, { quantity: Number(e.target.value) || 0 })
+                        }
+                        onBlur={() => {
+                          if (!item.quantity || item.quantity < 1) {
+                            updateItem(item.localId, { quantity: 1 });
+                          }
+                        }}
+                      />
+                    </Field>
+                    <Field label={t('form.customOrderRequestUnitPriceSystem')}>
+                      <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm font-medium">
+                        {formatCurrency(item.unit_price ?? 0)}
+                      </div>
+                    </Field>
+                  </Box>
+                </>
+              ) : (
+                <>
+                  <Field label={t('form.customOrderRequestProductName')}>
+                    <input
+                      type="text"
+                      className={fieldInputClass}
+                      value={item.product_name}
+                      onChange={(e) => updateItem(item.localId, { product_name: e.target.value })}
+                      placeholder={t('form.customOrderRequestProductNamePlaceholder')}
+                    />
+                  </Field>
+                  <Box className="grid grid-cols-2 gap-3">
+                    <Field label={t('form.customOrderRequestUnitPrice')}>
+                      <input
+                        type="number"
+                        min={0}
+                        step="any"
+                        className={fieldInputClass}
+                        value={item.unit_price}
+                        onChange={(e) =>
+                          updateItem(item.localId, { unit_price: Number(e.target.value) || 0 })
+                        }
+                      />
+                    </Field>
+                    <Field label={t('columns.quantity')}>
+                      <input
+                        type="number"
+                        min={1}
+                        className={fieldInputClass}
+                        value={item.quantity || ''}
+                        onChange={(e) =>
+                          updateItem(item.localId, { quantity: Number(e.target.value) || 0 })
+                        }
+                        onBlur={() => {
+                          if (!item.quantity || item.quantity < 1) {
+                            updateItem(item.localId, { quantity: 1 });
+                          }
+                        }}
+                      />
+                    </Field>
+                  </Box>
+                  <Field label={t('form.customOrderRequestInvoiceOptional')}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="block w-full text-sm file:me-3 file:rounded-lg file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary"
+                      onChange={(e) =>
+                        updateItem(item.localId, {
+                          invoice_image: e.target.files?.[0] ?? null,
+                        })
+                      }
+                    />
+                  </Field>
+                </>
+              )}
+
+              <Field label={t('form.customOrderRequestLineNote')}>
+                <input
+                  type="text"
+                  className={fieldInputClass}
+                  value={item.note ?? ''}
+                  onChange={(e) => updateItem(item.localId, { note: e.target.value })}
+                />
+              </Field>
+
+              <div className="flex justify-between border-t border-border/50 pt-2 text-sm">
+                <span className="text-muted-foreground">{t('form.customOrderRequestLineTotal')}</span>
+                <span className="font-semibold">
+                  {formatCurrency((Number(item.unit_price) || 0) * (Number(item.quantity) || 0))}
+                </span>
+              </div>
+            </Box>
+          ))}
         </Box>
       )}
 
-      <Box className="space-y-3">
-        {items.map((item, index) => (
-          <Box
-            key={item.localId}
-            className="rounded-xl border border-border/50 bg-background/70 p-4 space-y-3"
-          >
-            <Box className="flex items-center justify-between gap-2">
-              <Box className="flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-xs font-semibold text-primary">
-                  {index + 1}
-                </span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                    item.type === 'catalog'
-                      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                      : 'bg-amber-500/15 text-amber-800 dark:text-amber-300'
-                  }`}
-                >
-                  {item.type === 'catalog'
-                    ? t('form.customOrderRequestTypeCatalog')
-                    : t('form.customOrderRequestTypeExternal')}
-                </span>
-              </Box>
-              <button
-                type="button"
-                onClick={() => removeItem(item.localId)}
-                className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                aria-label={t('form.remove')}
-              >
-                <Iconify icon="solar:trash-bin-trash-bold" width={18} />
-              </button>
-            </Box>
-
-            {item.type === 'catalog' ? (
-              <>
-                <Box>
-                  <Typography variant="caption" className="mb-1 block text-muted-foreground">
-                    {t('form.customOrderRequestVariant')}
-                  </Typography>
-                  <InfiniteScrollSelect
-                    value={item.shop_product_variant_id || 0}
-                    onChange={(variantId) => {
-                      const id = Number(variantId) || 0;
-                      const cached = queryClient.getQueryData(VARIANT_SELECT_QUERY_KEY) as
-                        | { pages?: Array<{ data?: { items?: ShopProductVariantItem[] } }> }
-                        | undefined;
-                      const option = cached?.pages
-                        ?.flatMap((p) => p?.data?.items ?? [])
-                        .find((row) => Number(row.id) === id);
-                      const sale = option ? resolveShopVariantSaleFields(option) : {};
-                      const after = sale.price_after_discount;
-                      const unit =
-                        after != null && Number(after) > 0
-                          ? Number(after)
-                          : Number(sale.price ?? 0);
-                      updateItem(item.localId, {
-                        shop_product_variant_id: id,
-                        unit_price: unit,
-                        label: option?.label ?? '',
-                      });
-                    }}
-                    queryKey={[...VARIANT_SELECT_QUERY_KEY]}
-                    fetcher={variantFetcher}
-                    placeholder={t('form.customOrderRequestSelectVariant')}
-                    getOptionImage={(opt) => shopVariantOptionImage(opt)}
-                    getOptionColorHex={(opt) => shopVariantOptionColorHex(opt)}
-                  />
-                </Box>
-                <Box className="grid grid-cols-2 gap-3">
-                  <Box>
-                    <Typography variant="caption" className="mb-1 block text-muted-foreground">
-                      {t('columns.quantity')}
-                    </Typography>
-                    <input
-                      type="number"
-                      min={1}
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                      value={item.quantity}
-                      onChange={(e) =>
-                        updateItem(item.localId, { quantity: Math.max(1, Number(e.target.value) || 1) })
-                      }
-                    />
-                  </Box>
-                  <Box>
-                    <Typography variant="caption" className="mb-1 block text-muted-foreground">
-                      {t('form.customOrderRequestUnitPriceSystem')}
-                    </Typography>
-                    <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm font-medium">
-                      {formatCurrency(item.unit_price ?? 0)}
-                    </div>
-                  </Box>
-                </Box>
-              </>
-            ) : (
-              <>
-                <Box>
-                  <Typography variant="caption" className="mb-1 block text-muted-foreground">
-                    {t('form.customOrderRequestProductName')}
-                  </Typography>
-                  <input
-                    type="text"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                    value={item.product_name}
-                    onChange={(e) => updateItem(item.localId, { product_name: e.target.value })}
-                    placeholder={t('form.customOrderRequestProductNamePlaceholder')}
-                  />
-                </Box>
-                <Box className="grid grid-cols-2 gap-3">
-                  <Box>
-                    <Typography variant="caption" className="mb-1 block text-muted-foreground">
-                      {t('form.customOrderRequestUnitPrice')}
-                    </Typography>
-                    <input
-                      type="number"
-                      min={0}
-                      step="any"
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                      value={item.unit_price}
-                      onChange={(e) =>
-                        updateItem(item.localId, { unit_price: Number(e.target.value) || 0 })
-                      }
-                    />
-                  </Box>
-                  <Box>
-                    <Typography variant="caption" className="mb-1 block text-muted-foreground">
-                      {t('columns.quantity')}
-                    </Typography>
-                    <input
-                      type="number"
-                      min={1}
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                      value={item.quantity}
-                      onChange={(e) =>
-                        updateItem(item.localId, { quantity: Math.max(1, Number(e.target.value) || 1) })
-                      }
-                    />
-                  </Box>
-                </Box>
-                <Box>
-                  <Typography variant="caption" className="mb-1 block text-muted-foreground">
-                    {t('form.customOrderRequestInvoiceOptional')}
-                  </Typography>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="block w-full text-sm file:me-3 file:rounded-lg file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary"
-                    onChange={(e) =>
-                      updateItem(item.localId, {
-                        invoice_image: e.target.files?.[0] ?? null,
-                      })
-                    }
-                  />
-                </Box>
-              </>
-            )}
-
-            <Box>
-              <Typography variant="caption" className="mb-1 block text-muted-foreground">
-                {t('form.noteLabel')}
-              </Typography>
-              <input
-                type="text"
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                value={item.note ?? ''}
-                onChange={(e) => updateItem(item.localId, { note: e.target.value })}
-              />
-            </Box>
-
-            <Typography variant="caption" className="text-muted-foreground">
-              {t('form.customOrderRequestLineTotal')}:{' '}
-              <span className="font-semibold text-foreground">
-                {formatCurrency((Number(item.unit_price) || 0) * (Number(item.quantity) || 0))}
-              </span>
+      {hasExternal && (
+        <Box className="space-y-3 rounded-xl border border-amber-500/25 bg-amber-500/5 p-4">
+          <Box>
+            <Typography variant="subtitle2" className="font-semibold text-amber-950 dark:text-amber-200">
+              {t('form.customOrderRequestVarianceTitle')}
+            </Typography>
+            <Typography variant="caption" className="mt-1 block text-muted-foreground">
+              {t('form.customOrderRequestVarianceHint')}
             </Typography>
           </Box>
-        ))}
-      </Box>
-
-      {hasExternal && (
-        <Box className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
-          <Typography variant="subtitle2" className="font-semibold text-amber-900 dark:text-amber-200">
-            {t('form.customOrderRequestVarianceTitle')}
-          </Typography>
-          <Typography variant="caption" className="block text-muted-foreground">
-            {t('form.customOrderRequestVarianceHint')}
-          </Typography>
           <Box className="grid grid-cols-2 gap-3">
-            <Box>
-              <Typography variant="caption" className="mb-1 block text-muted-foreground">
-                {t('form.customOrderRequestVarianceType')}
-              </Typography>
+            <Field label={t('form.customOrderRequestVarianceType')}>
               <select
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                className={fieldInputClass}
                 value={varianceType}
                 onChange={(e) => setVarianceType(e.target.value as 'percent' | 'fixed')}
               >
                 <option value="percent">{t('form.customOrderRequestVariancePercent')}</option>
                 <option value="fixed">{t('form.customOrderRequestVarianceFixed')}</option>
               </select>
-            </Box>
-            <Box>
-              <Typography variant="caption" className="mb-1 block text-muted-foreground">
-                {t('form.customOrderRequestVarianceValue')}
-              </Typography>
+            </Field>
+            <Field label={t('form.customOrderRequestVarianceValue')}>
               <input
                 type="number"
                 min={0}
                 step="any"
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                className={fieldInputClass}
                 value={varianceValue}
                 onChange={(e) => setVarianceValue(e.target.value)}
               />
-            </Box>
+            </Field>
           </Box>
         </Box>
       )}
 
       <Box className="grid gap-3 sm:grid-cols-2">
-        <Box>
-          <Typography variant="caption" className="mb-1 block text-muted-foreground">
-            {t('form.customOrderRequestDeliveryPrice')}
-          </Typography>
+        <Field label={t('form.customOrderRequestDeliveryPrice')}>
           <input
             type="number"
             min={0}
             step="any"
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            className={fieldInputClass}
             value={deliveryPrice}
             onChange={(e) => setDeliveryPrice(e.target.value)}
           />
-        </Box>
-        <Box className="flex items-end">
-          <label className="flex items-center gap-2 text-sm cursor-pointer pb-2">
-            <input
-              type="checkbox"
-              checked={isInstantDelivery}
-              onChange={(e) => setIsInstantDelivery(e.target.checked)}
-              className="size-4 rounded border-border"
-            />
-            {t('form.customOrderRequestInstantDelivery')}
-          </label>
-        </Box>
+        </Field>
+        <label className="flex items-center gap-2 self-end pb-2 text-sm">
+          <input
+            type="checkbox"
+            checked={isInstantDelivery}
+            onChange={(e) => setIsInstantDelivery(e.target.checked)}
+            className="size-4 rounded border-border"
+          />
+          {t('form.customOrderRequestInstantDelivery')}
+        </label>
       </Box>
 
-      <Box>
-        <Typography variant="caption" className="mb-1 block text-muted-foreground">
-          {t('form.customOrderRequestAdminNote')}
-        </Typography>
+      <Field label={t('form.customOrderRequestAdminNote')}>
         <textarea
-          className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+          className={`${fieldInputClass} resize-none`}
           rows={2}
           value={adminNote}
           onChange={(e) => setAdminNote(e.target.value)}
         />
-      </Box>
+      </Field>
 
-      <Box className="rounded-xl border border-border bg-card p-4 space-y-2">
+      <Box className="space-y-2 rounded-xl border border-border bg-muted/20 p-4">
         <Typography variant="subtitle2" className="font-semibold">
           {t('form.customOrderRequestPriceSummary')}
         </Typography>
@@ -487,8 +482,8 @@ export function ConvertCustomOrderForm({ onSubmit, isSubmitting }: Props) {
       <Button
         type="button"
         onClick={handleSubmit}
-        disabled={isSubmitting}
-        className="w-full sm:w-auto"
+        disabled={isSubmitting || items.length === 0}
+        className="w-full"
       >
         <Iconify icon="solar:plain-2-bold" width={18} className="me-2" />
         {isSubmitting
@@ -496,5 +491,47 @@ export function ConvertCustomOrderForm({ onSubmit, isSubmitting }: Props) {
           : t('form.customOrderRequestSendForApproval')}
       </Button>
     </Box>
+  );
+}
+
+const fieldInputClass =
+  'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25';
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <Box>
+      <Typography variant="caption" className="mb-1.5 block text-muted-foreground">
+        {label}
+      </Typography>
+      {children}
+    </Box>
+  );
+}
+
+function ChoiceCard({
+  icon,
+  title,
+  hint,
+  onClick,
+}: {
+  icon: string;
+  title: string;
+  hint: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex h-full flex-col items-start gap-3 rounded-xl border border-border/70 bg-background/80 p-4 text-start transition hover:border-primary/40 hover:bg-primary/[0.04] hover:shadow-sm"
+    >
+      <span className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <Iconify icon={icon} width={20} />
+      </span>
+      <span>
+        <span className="block text-sm font-semibold text-foreground">{title}</span>
+        <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{hint}</span>
+      </span>
+    </button>
   );
 }
