@@ -851,8 +851,6 @@ export default function DetailsPage() {
 
   const product = productResponse as any;
   const isRestaurant = Boolean(product?.is_restaurant ?? product?.category?.is_restaurant);
-  const yes = t('form.productDetailsYes');
-  const no = t('form.productDetailsNo');
 
   const gallery: Array<{ id?: number; url: string }> = Array.isArray(product.images) ? product.images : [];
   const heroSrc =

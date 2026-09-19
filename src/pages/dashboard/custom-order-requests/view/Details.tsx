@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { ConvertCustomOrderPayload } from '@/pages/dashboard/custom-order-requests/types/custom-order-request.types';
 
 import { useState } from 'react';
@@ -32,11 +33,11 @@ import { Box, Button, Typography } from 'src/shared/ui';
 import { LoadingScreen } from 'src/shared/components/loading-screen';
 
 const statusColors: Record<string, string> = {
-  pending_pricing: 'border-amber-500/30 bg-amber-500/15 text-amber-800 dark:text-amber-300',
-  waiting_approval: 'border-sky-500/30 bg-sky-500/15 text-sky-800 dark:text-sky-300',
-  cancelled: 'border-red-500/30 bg-red-500/15 text-red-700 dark:text-red-400',
-  approved: 'border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
-  converted: 'border-violet-500/30 bg-violet-500/15 text-violet-700 dark:text-violet-300',
+  pending_pricing: 'bg-amber-500/15 text-amber-800 dark:text-amber-300',
+  waiting_approval: 'bg-sky-500/15 text-sky-800 dark:text-sky-300',
+  cancelled: 'bg-muted text-muted-foreground',
+  approved: 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300',
+  converted: 'bg-violet-500/15 text-violet-800 dark:text-violet-300',
 };
 
 export default function DetailsPage() {
@@ -81,8 +82,16 @@ export default function DetailsPage() {
   const expectedTime = getCustomOrderRequestExpectedTime(item);
   const images = getCustomOrderRequestImageUrls(item);
   const orderId = convertedOrderId ?? getLinkedOrderId(item);
-  const statusClass =
-    statusColors[status] ?? 'border-border bg-muted text-muted-foreground';
+  const statusClass = statusColors[status] ?? 'bg-muted text-muted-foreground';
+  const customerName = getCustomOrderRequestUserName(item);
+  const customerPhone = getCustomOrderRequestUserPhone(item);
+  const customerEmail = customOrderDisplayText(item.user?.email);
+  const createdAt = getCustomOrderRequestCreatedAt(item);
+  const paymentMethod = getCustomOrderRequestPaymentMethodLabel(item);
+  const statusLabel = getCustomOrderRequestStatusLabel(
+    item,
+    t(`form.customOrderRequestStatus_${status}`, { defaultValue: status })
+  );
 
   const handleConvert = async (payload: ConvertCustomOrderPayload) => {
     if (!id) return;
@@ -93,8 +102,7 @@ export default function DetailsPage() {
         res?.data?.order?.id ??
         res?.data?.id ??
         getLinkedOrderId(res?.data ?? {});
-      const parsed =
-        newOrderId != null && Number(newOrderId) > 0 ? Number(newOrderId) : null;
+      const parsed = newOrderId != null && Number(newOrderId) > 0 ? Number(newOrderId) : null;
       if (parsed) {
         setConvertedOrderId(parsed);
       }
@@ -146,49 +154,50 @@ export default function DetailsPage() {
         </button>
       )}
 
-      <Box className="relative w-full min-h-screen overflow-hidden bg-background">
-        <Box className="relative mx-auto w-full max-w-7xl px-4 pb-10 pt-6 sm:px-6 lg:px-8">
+      <Box className="relative min-h-screen overflow-hidden bg-background px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <Box className="pointer-events-none fixed inset-0 bg-gradient-to-br from-background via-background to-muted/30" />
+
+        <Box className="relative mx-auto w-full max-w-7xl">
           <Button
             variant="text"
             onClick={() => navigate('/custom-order-requests')}
-            className="-ms-2 mb-6 text-muted-foreground hover:text-foreground"
+            className="-ms-2 mb-4 text-muted-foreground hover:text-foreground"
           >
             <Iconify icon="solar:arrow-left-bold" width={20} className="me-2" />
             {t('form.backLabel')}
           </Button>
 
-          <Box className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <Box>
-              <Box className="mb-2 flex flex-wrap items-center gap-2">
-                <Typography variant="h4" className="font-bold tracking-tight">
-                  {t('form.customOrderRequestTitle', { id: item.id })}
-                </Typography>
-                <span
-                  className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusClass}`}
-                >
-                  {getCustomOrderRequestStatusLabel(
-                    item,
-                    t(`form.customOrderRequestStatus_${status}`, { defaultValue: status })
-                  )}
-                </span>
+          <Box className="mb-6 flex flex-col gap-4 rounded-2xl border border-border/50 bg-card/80 p-5 shadow-sm backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:p-6 lg:mb-8">
+            <Box className="flex min-w-0 items-start gap-4">
+              <Box className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 sm:h-16 sm:w-16">
+                <Iconify icon="solar:clipboard-list-bold" className="text-primary" width={28} />
               </Box>
-              <Typography variant="body2" className="text-muted-foreground">
-                {[
-                  getCustomOrderRequestUserName(item),
-                  getCustomOrderRequestUserPhone(item),
-                  customOrderDisplayText(item.user?.email),
-                ]
-                  .filter((part) => part && part !== '—')
-                  .join(' · ')}
-              </Typography>
-              {getCustomOrderRequestCreatedAt(item) !== '—' && (
-                <Typography variant="caption" className="mt-1 block text-muted-foreground">
-                  {getCustomOrderRequestCreatedAt(item)}
+              <Box className="min-w-0">
+                <Typography variant="overline" className="mb-0.5 block text-muted-foreground">
+                  {t('form.customOrderRequestKicker')}
                 </Typography>
-              )}
+                <Box className="mb-1 flex flex-wrap items-center gap-2">
+                  <Typography variant="h4" className="font-bold tracking-tight text-foreground">
+                    {t('form.customOrderRequestTitle', { id: item.id })}
+                  </Typography>
+                  <span
+                    className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass}`}
+                  >
+                    {statusLabel}
+                  </span>
+                </Box>
+                <Typography variant="body2" className="text-muted-foreground">
+                  {[customerName, customerPhone, customerEmail].filter((part) => part && part !== '—').join(' · ')}
+                </Typography>
+                {createdAt !== '—' && (
+                  <Typography variant="caption" className="mt-1 block text-muted-foreground">
+                    {createdAt}
+                  </Typography>
+                )}
+              </Box>
             </Box>
 
-            <Box className="flex flex-wrap gap-2">
+            <Box className="flex shrink-0 flex-wrap gap-2">
               {orderId != null && (
                 <Link
                   to={`/orders/details/${orderId}`}
@@ -213,16 +222,18 @@ export default function DetailsPage() {
           </Box>
 
           {convertedOrderId != null && (
-            <Box className="mb-6 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 space-y-3">
-              <Typography variant="subtitle2" className="font-semibold text-emerald-900 dark:text-emerald-200">
-                {t('form.customOrderRequestConvertSuccess')}
-              </Typography>
-              <Typography variant="body2" className="text-muted-foreground">
-                {t('form.customOrderRequestLinkedOrder', { id: convertedOrderId })}
-              </Typography>
+            <Box className="mb-6 flex flex-col gap-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <Box>
+                <Typography variant="subtitle2" className="font-semibold text-emerald-900 dark:text-emerald-200">
+                  {t('form.customOrderRequestConvertSuccess')}
+                </Typography>
+                <Typography variant="body2" className="text-muted-foreground">
+                  {t('form.customOrderRequestLinkedOrder', { id: convertedOrderId })}
+                </Typography>
+              </Box>
               <Link
                 to={`/orders/details/${convertedOrderId}`}
-                className="inline-flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/10"
+                className="inline-flex items-center gap-2 rounded-xl border border-primary/30 bg-background/70 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/10"
               >
                 <Iconify icon="solar:bag-5-bold" width={18} />
                 {t('form.customOrderRequestOpenOrder', { id: convertedOrderId })}
@@ -231,18 +242,18 @@ export default function DetailsPage() {
           )}
 
           {showCancel && canUpdate && canCancelStatus && (
-            <Box className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 space-y-3">
-              <Typography variant="subtitle2" className="font-semibold">
+            <Box className="mb-6 rounded-2xl border border-destructive/25 bg-destructive/5 p-5">
+              <Typography variant="subtitle2" className="mb-3 font-semibold">
                 {t('form.customOrderRequestCancelTitle')}
               </Typography>
               <textarea
-                className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-destructive/30"
+                className="mb-3 w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-destructive/30"
                 rows={3}
                 placeholder={t('form.customOrderRequestRejectionPlaceholder')}
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
               />
-              <Box className="flex gap-2">
+              <Box className="flex flex-wrap gap-2">
                 <Button
                   type="button"
                   onClick={handleCancel}
@@ -261,55 +272,37 @@ export default function DetailsPage() {
           )}
 
           {(item.rejection_reason || item.admin_note) && (
-            <Box className="mb-6 grid gap-3 sm:grid-cols-2">
-              {item.rejection_reason && (
-                <Box className="rounded-xl border border-border bg-card p-4">
-                  <Typography variant="caption" className="text-muted-foreground">
-                    {t('form.customOrderRequestRejectionReason')}
-                  </Typography>
-                  <Typography variant="body2" className="mt-1">
-                    {customOrderDisplayText(item.rejection_reason) || '—'}
-                  </Typography>
-                </Box>
-              )}
-              {item.admin_note && (
-                <Box className="rounded-xl border border-border bg-card p-4">
-                  <Typography variant="caption" className="text-muted-foreground">
-                    {t('form.customOrderRequestAdminNote')}
-                  </Typography>
-                  <Typography variant="body2" className="mt-1">
-                    {customOrderDisplayText(item.admin_note) || '—'}
-                  </Typography>
-                </Box>
-              )}
+            <Box className="mb-6 grid gap-4 sm:grid-cols-2">
+              {item.rejection_reason ? (
+                <Section title={t('form.customOrderRequestRejectionReason')} icon="solar:danger-triangle-bold">
+                  <Typography variant="body2">{customOrderDisplayText(item.rejection_reason) || '—'}</Typography>
+                </Section>
+              ) : null}
+              {item.admin_note ? (
+                <Section title={t('form.customOrderRequestAdminNote')} icon="solar:document-text-bold">
+                  <Typography variant="body2">{customOrderDisplayText(item.admin_note) || '—'}</Typography>
+                </Section>
+              ) : null}
             </Box>
           )}
 
-          <Box className="grid gap-6 lg:grid-cols-2">
-            {/* Customer request */}
-            <Box className="space-y-4">
-              <Box className="rounded-2xl border border-border/50 bg-card/80 p-5 shadow-sm">
-                <Typography variant="subtitle2" className="mb-3 font-semibold">
-                  {t('form.customOrderRequestCustomerText')}
-                </Typography>
-                <Typography variant="body1" className="whitespace-pre-wrap text-foreground/90">
+          <Box className="grid items-start gap-5 lg:grid-cols-12 lg:gap-6">
+            <Box className="space-y-5 lg:col-span-5">
+              <Section title={t('form.customOrderRequestCustomerText')} icon="solar:chat-round-dots-bold">
+                <Typography variant="body1" className="whitespace-pre-wrap leading-relaxed text-foreground/90">
                   {customerText}
                 </Typography>
-              </Box>
+              </Section>
 
-              <Box className="rounded-2xl border border-border/50 bg-card/80 p-5 shadow-sm space-y-3">
-                <FieldRow label={t('form.customOrderRequestAddress')} value={address} />
-                <FieldRow label={t('form.customOrderRequestExpectedTime')} value={expectedTime} />
-                <FieldRow
-                  label={t('columns.paymentMethod')}
-                  value={getCustomOrderRequestPaymentMethodLabel(item)}
-                />
-              </Box>
+              <Section title={t('form.customOrderRequestAddress')} icon="solar:map-point-bold">
+                <dl className="space-y-3">
+                  <MetaRow label={t('form.customOrderRequestAddress')} value={address} />
+                  <MetaRow label={t('form.customOrderRequestExpectedTime')} value={expectedTime} />
+                  <MetaRow label={t('columns.paymentMethod')} value={paymentMethod} />
+                </dl>
+              </Section>
 
-              <Box className="rounded-2xl border border-border/50 bg-card/80 p-5 shadow-sm">
-                <Typography variant="subtitle2" className="mb-3 font-semibold">
-                  {t('form.customOrderRequestCustomerImages')}
-                </Typography>
+              <Section title={t('form.customOrderRequestCustomerImages')} icon="solar:gallery-bold">
                 {images.length === 0 ? (
                   <Typography variant="body2" className="text-muted-foreground">
                     {t('form.customOrderRequestNoImages')}
@@ -321,44 +314,49 @@ export default function DetailsPage() {
                         key={url}
                         type="button"
                         onClick={() => setLightboxUrl(url)}
-                        className="aspect-square overflow-hidden rounded-xl border border-border/50 bg-muted/30"
+                        className="aspect-square overflow-hidden rounded-xl border border-border/50 bg-muted/30 transition hover:ring-2 hover:ring-primary/30"
                       >
                         <img src={url} alt="" className="h-full w-full object-cover" />
                       </button>
                     ))}
                   </Box>
                 )}
-              </Box>
+              </Section>
             </Box>
 
-            {/* Convert / status panel */}
-            <Box className="rounded-2xl border border-border/50 bg-card/80 p-5 shadow-sm">
-              {isPendingPricing && canUpdate ? (
-                <ConvertCustomOrderForm
-                  onSubmit={handleConvert}
-                  isSubmitting={convertMutation.isPending}
-                />
-              ) : (
-                <Box className="space-y-3">
-                  <Typography variant="subtitle2" className="font-semibold">
-                    {t('form.customOrderRequestStatusPanel')}
-                  </Typography>
-                  <Typography variant="body2" className="text-muted-foreground">
-                    {isPendingPricing
-                      ? t('form.customOrderRequestNoUpdatePermission')
-                      : t('form.customOrderRequestNotPendingPricing')}
-                  </Typography>
-                  {orderId != null && (
-                    <Link
-                      to={`/orders/details/${orderId}`}
-                      className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-                    >
-                      <Iconify icon="solar:arrow-right-up-bold" width={16} />
-                      {t('form.customOrderRequestOpenOrder', { id: orderId })}
-                    </Link>
-                  )}
-                </Box>
-              )}
+            <Box className="lg:sticky lg:top-6 lg:col-span-7">
+              <Section
+                title={
+                  isPendingPricing
+                    ? t('form.customOrderRequestBuildItems')
+                    : t('form.customOrderRequestStatusPanel')
+                }
+                icon="solar:wallet-money-bold"
+              >
+                {isPendingPricing && canUpdate ? (
+                  <ConvertCustomOrderForm
+                    onSubmit={handleConvert}
+                    isSubmitting={convertMutation.isPending}
+                  />
+                ) : (
+                  <Box className="space-y-3">
+                    <Typography variant="body2" className="text-muted-foreground">
+                      {isPendingPricing
+                        ? t('form.customOrderRequestNoUpdatePermission')
+                        : t('form.customOrderRequestNotPendingPricing')}
+                    </Typography>
+                    {orderId != null && (
+                      <Link
+                        to={`/orders/details/${orderId}`}
+                        className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                      >
+                        <Iconify icon="solar:arrow-right-up-bold" width={16} />
+                        {t('form.customOrderRequestOpenOrder', { id: orderId })}
+                      </Link>
+                    )}
+                  </Box>
+                )}
+              </Section>
             </Box>
           </Box>
         </Box>
@@ -367,15 +365,35 @@ export default function DetailsPage() {
   );
 }
 
-function FieldRow({ label, value }: { label: string; value: string }) {
+function Section({
+  title,
+  icon,
+  children,
+}: {
+  title: string;
+  icon: string;
+  children: ReactNode;
+}) {
   return (
-    <Box>
-      <Typography variant="caption" className="text-muted-foreground">
-        {label}
-      </Typography>
-      <Typography variant="body2" className="mt-0.5 font-medium text-foreground">
-        {value}
-      </Typography>
+    <Box className="overflow-hidden rounded-2xl border border-border/50 bg-card/80 shadow-sm backdrop-blur-sm">
+      <Box className="flex items-center gap-3 border-b border-border/40 bg-muted/15 px-4 py-3.5 sm:px-5">
+        <Box className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/10 bg-primary/10">
+          <Iconify icon={icon} className="text-primary" width={18} />
+        </Box>
+        <Typography variant="subtitle1" className="font-semibold">
+          {title}
+        </Typography>
+      </Box>
+      <Box className="p-4 sm:p-5">{children}</Box>
     </Box>
+  );
+}
+
+function MetaRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 text-sm font-medium text-foreground">{value}</dd>
+    </div>
   );
 }

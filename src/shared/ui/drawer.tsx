@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useRef, useEffect } from 'react';
 import { mergeClasses } from 'minimal-shared/utils';
 
 export interface DrawerProps {
