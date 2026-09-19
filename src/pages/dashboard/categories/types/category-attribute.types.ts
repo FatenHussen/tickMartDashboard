@@ -69,6 +69,8 @@ export interface CategoryAttributeCreateUpdatePayload {
   };
   type: string;
   values?: Array<{
+    /** Required on update for existing values so the backend keeps the same row/id. */
+    id?: number;
     name: {
       en: string;
       ar: string;

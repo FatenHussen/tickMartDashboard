@@ -14,6 +14,10 @@ import { RHFInfiniteSelect } from '@/shared/components/hook-form/rhf-infinite-se
 import { isRootCategory } from '@/pages/dashboard/categories/utils/category-cascade-shared';
 import { paginateSelectRowsLocal } from '@/pages/dashboard/categories/utils/build-parent-picker-options';
 import {
+  toCategoryAttributeValueFormRow,
+  toCategoryAttributeValuePayload,
+} from '@/pages/dashboard/categories/utils/category-attribute-values';
+import {
   CategoryAttributeSchema,
   type CategoryAttributeFormValues,
 } from '@/pages/dashboard/categories/validation/category-attribute.validation';
@@ -92,6 +96,8 @@ export default function CreatePage() {
   const { fields, append, remove } = useFieldArray({
     control,
     name: 'values',
+    // Keep API `id` on the row — default keyName "id" would overwrite it.
+    keyName: 'fieldKey',
   });
 
   const rootCategoryFetcher = useCallback(
@@ -123,15 +129,7 @@ export default function CreatePage() {
           attribute.type === 'color'
             ? []
             : attribute.values?.length > 0
-              ? attribute.values.map((val) => ({
-                  name:
-                    typeof val.name === 'string'
-                      ? { en: val.name, ar: val.name }
-                      : {
-                          en: val.name?.en ?? '',
-                          ar: val.name?.ar ?? '',
-                        },
-                }))
+              ? attribute.values.map(toCategoryAttributeValueFormRow)
               : [{ name: { en: '', ar: '' } }],
       });
     }
@@ -180,12 +178,7 @@ export default function CreatePage() {
         type: data.type,
         ...(data.type !== 'color'
           ? {
-              values: data.values.map((val) => ({
-                name: {
-                  en: val.name.en,
-                  ar: val.name.ar,
-                },
-              })),
+              values: data.values.map(toCategoryAttributeValuePayload),
             }
           : {}),
       };
@@ -423,7 +416,7 @@ export default function CreatePage() {
                 const canRemove = fields.length > 1;
                 return (
                   <Box
-                    key={field.id}
+                    key={field.id ?? field.fieldKey}
                     className="p-4 rounded-xl border border-border/60 bg-muted/25 space-y-3"
                   >
                     <Box className="flex flex-wrap items-center justify-between gap-3">

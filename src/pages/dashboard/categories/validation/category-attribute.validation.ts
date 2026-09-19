@@ -15,6 +15,7 @@ export const CategoryAttributeSchema = zod.object({
   type: zod.string().min(1, { message: t('categoryAttribute.typeRequired') }),
   values: zod.array(
     zod.object({
+      id: zod.number().int().positive().optional(),
       name: zod.object({
         en: zod.string().min(1, { message: t('categoryAttribute.valueNameEnRequired') }),
         ar: zod.string().min(1, { message: t('categoryAttribute.valueNameArRequired') }),
