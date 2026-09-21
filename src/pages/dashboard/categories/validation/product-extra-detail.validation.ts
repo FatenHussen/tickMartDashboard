@@ -12,9 +12,15 @@ export const ProductExtraDetailSchema = zod.object({
     en: zod.string().min(1, { message: t('productExtraDetail.detailKeyEnRequired') }),
     ar: zod.string().min(1, { message: t('productExtraDetail.detailKeyArRequired') }),
   }),
+  price: zod.coerce
+    .number({
+      invalid_type_error: t('productExtraDetail.priceRequired'),
+      required_error: t('productExtraDetail.priceRequired'),
+    })
+    .min(0, { message: t('productExtraDetail.priceMin') }),
   detail_value: zod.object({
-    en: zod.string().min(1, { message: t('productExtraDetail.detailValueEnRequired') }),
-    ar: zod.string().min(1, { message: t('productExtraDetail.detailValueArRequired') }),
+    en: zod.string().optional().default(''),
+    ar: zod.string().optional().default(''),
   }),
   is_active: zod.boolean(),
 });

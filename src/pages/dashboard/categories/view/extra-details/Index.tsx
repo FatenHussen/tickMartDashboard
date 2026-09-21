@@ -45,7 +45,8 @@ function normalizeRows(items: ProductExtraDetailRowApi[]): ProductExtraDetailTab
   return items.map((item) => ({
     id: item.id,
     detail_key: formatTranslated(item.detail_key),
-    detail_value: formatTranslated(item.detail_value),
+    detail_value: item.detail_value ? formatTranslated(item.detail_value) : '',
+    price: Number(item.price) || 0,
     category: item.category ? formatTranslated(item.category.name) : '-',
     is_active: Boolean(item.is_active),
   }));
@@ -220,8 +221,9 @@ export default function Page() {
         onFilterReset={onFilterReset}
         columnTranslations={{
           id: t('columns.id'),
-          detail_key: t('columns.detailKey'),
-          detail_value: t('columns.detailValue'),
+          detail_key: t('columns.addOnName'),
+          price: t('columns.price'),
+          detail_value: t('columns.description'),
           category: t('columns.category'),
           status: t('columns.status'),
           actions: t('columns.action'),

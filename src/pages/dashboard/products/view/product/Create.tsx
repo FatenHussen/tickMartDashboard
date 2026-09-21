@@ -642,13 +642,27 @@ function findPresetIdForProductExtraPivot(
     const pv = normalizeProductExtraLang(pr.detail_value);
     if (pk.en === ke && pk.ar === ka && pv.en === ve && pv.ar === va) return pr.id;
   }
+  // Fallback: match by name only (description/value is optional on add-ons)
+  for (const pr of presets) {
+    const pk = normalizeProductExtraLang(pr.detail_key);
+    if (pk.en === ke && pk.ar === ka) return pr.id;
+  }
   return 0;
 }
 
 function labelProductExtraPreset(pr: ProductExtraDetailRowApi): string {
-  const kt = formatTranslated(pr.detail_key as Parameters<typeof formatTranslated>[0]);
-  const vt = formatTranslated(pr.detail_value as Parameters<typeof formatTranslated>[0]);
-  return `${kt} — ${vt}`;
+  const name = formatTranslated(pr.detail_key as Parameters<typeof formatTranslated>[0]);
+  const price = Number(pr.price);
+  if (Number.isFinite(price)) {
+    return `${name} — ${price}`;
+  }
+  return name;
+}
+
+function poolPriceForPreset(pr: ProductExtraDetailRowApi | undefined): number {
+  if (!pr) return 0;
+  const n = Number(pr.price);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
 function toDateInputLocalYMD(d: Date): string {
@@ -980,6 +994,7 @@ export default function CreatePage() {
   const watchedBoughtWith = watch('bought_with') || [];
   const watchedVendorId = watch('vendor_id');
   const saleChannelWatch = watch('sale_channel');
+  const deliveryTimeWatch = watch('delivery_time');
   const isShopSaleChannel =
     saleChannelWatch === 'shop' || isRestaurantToggle === true;
   const sypRate = sypCurrency ? parseCurrencyRate(sypCurrency) : null;
@@ -2765,7 +2780,10 @@ export default function CreatePage() {
                     readOnly
                     tabIndex={-1}
                     className={`${inputCls} bg-muted/40 text-muted-foreground cursor-default`}
-                    value={t('form.variantDeliveryTimeAuto')}
+                    value={
+                      String(deliveryTimeWatch ?? '').trim() ||
+                      t('form.variantDeliveryTimeAuto')
+                    }
                   />
                 </Box>
               </Box>
@@ -2837,6 +2855,9 @@ export default function CreatePage() {
                           placeholder={t('form.variantDeliveryTimePlaceholder')}
                           className={fieldInputClass(!!error)}
                         />
+                        <Typography variant="caption" className="text-muted-foreground mt-1 block">
+                          {t('form.productDeliveryTimeExternalHint')}
+                        </Typography>
                         <FieldErrorText message={error?.message} />
                       </div>
                     )}
@@ -3543,7 +3564,16 @@ export default function CreatePage() {
                               value={f.value ? String(f.value) : ''}
                               onChange={(e) => {
                                 const v = e.target.value;
-                                f.onChange(v ? Number(v) : 0);
+                                const nextId = v ? Number(v) : 0;
+                                f.onChange(nextId);
+                                if (nextId > 0) {
+                                  const preset = productExtraPresets.find((p) => p.id === nextId);
+                                  setValue(
+                                    `extra_details.${index}.price`,
+                                    poolPriceForPreset(preset),
+                                    { shouldValidate: true, shouldDirty: true }
+                                  );
+                                }
                               }}
                               onBlur={f.onBlur}
                               ref={f.ref}

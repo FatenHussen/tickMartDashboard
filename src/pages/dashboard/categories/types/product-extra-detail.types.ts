@@ -14,7 +14,8 @@ export interface ProductExtraDetailRowApi {
   id: number;
   category?: ProductExtraDetailCategoryRef;
   detail_key: string | ProductExtraDetailLangPair;
-  detail_value: string | ProductExtraDetailLangPair;
+  detail_value?: string | ProductExtraDetailLangPair | null;
+  price: number;
   is_active: boolean;
 }
 
@@ -39,7 +40,8 @@ export interface ProductExtraDetailDetailData {
     name: ProductExtraDetailLangPair | string;
   };
   detail_key: ProductExtraDetailLangPair;
-  detail_value: ProductExtraDetailLangPair;
+  detail_value?: ProductExtraDetailLangPair | null;
+  price: number;
   is_active: boolean;
 }
 
@@ -52,6 +54,7 @@ export interface ProductExtraDetailDetailResponse {
 export interface ProductExtraDetailCreateUpdatePayload {
   category_id: number;
   detail_key: ProductExtraDetailLangPair;
-  detail_value: ProductExtraDetailLangPair;
+  price: number;
+  detail_value?: ProductExtraDetailLangPair;
   is_active: boolean;
 }

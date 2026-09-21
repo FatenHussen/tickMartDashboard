@@ -12,6 +12,7 @@ const RowSchema = z.object({
   id: z.number(),
   detail_key: z.string(),
   detail_value: z.string(),
+  price: z.number(),
   category: z.string(),
   is_active: z.boolean(),
 });
@@ -20,6 +21,7 @@ export interface ProductExtraDetailTableRow {
   id: number;
   detail_key: string;
   detail_value: string;
+  price: number;
   category: string;
   is_active: boolean;
   [key: string]: unknown;
@@ -42,12 +44,12 @@ export const productExtraDetailColumns = (
     id: 'detail_key',
     accessorKey: 'detail_key',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title={t('columns.detailKey')} />
+      <DataTableColumnHeader column={column} title={t('columns.addOnName')} />
     ),
     cell: ({ row }) => (
       <div className="flex items-center gap-2.5 min-w-0">
         <div className="w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-          <Iconify icon="solar:key-bold" className="text-primary" width={18} height={18} />
+          <Iconify icon="solar:tag-price-bold" className="text-primary" width={18} height={18} />
         </div>
         <span className="font-semibold text-foreground truncate">
           {formatTranslated(row.original.detail_key)}
@@ -56,16 +58,31 @@ export const productExtraDetailColumns = (
     ),
   },
   {
+    id: 'price',
+    accessorKey: 'price',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title={t('columns.price')} />
+    ),
+    cell: ({ row }) => (
+      <span className="text-sm font-medium text-foreground tabular-nums">
+        {Number.isFinite(row.original.price) ? row.original.price : '—'}
+      </span>
+    ),
+  },
+  {
     id: 'detail_value',
     accessorKey: 'detail_value',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title={t('columns.detailValue')} />
+      <DataTableColumnHeader column={column} title={t('columns.description')} />
     ),
-    cell: ({ row }) => (
-      <span className="text-sm text-muted-foreground truncate block max-w-[240px]">
-        {formatTranslated(row.original.detail_value)}
-      </span>
-    ),
+    cell: ({ row }) => {
+      const value = formatTranslated(row.original.detail_value);
+      return (
+        <span className="text-sm text-muted-foreground truncate block max-w-[240px]">
+          {value || '—'}
+        </span>
+      );
+    },
   },
   {
     id: 'category',

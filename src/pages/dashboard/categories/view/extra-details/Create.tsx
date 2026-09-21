@@ -99,6 +99,7 @@ export default function CreatePage() {
   const defaultValues: ProductExtraDetailFormValues = {
     category_id: 0,
     detail_key: { en: '', ar: '' },
+    price: 0,
     detail_value: { en: '', ar: '' },
     is_active: true,
   };
@@ -123,6 +124,7 @@ export default function CreatePage() {
       reset({
         category_id: d.category.id,
         detail_key: langPair(d.detail_key),
+        price: Number(d.price) || 0,
         detail_value: langPair(d.detail_value),
         is_active: Boolean(d.is_active),
       });
@@ -135,10 +137,13 @@ export default function CreatePage() {
 
   const onSubmit = async (data: ProductExtraDetailFormValues) => {
     try {
+      const valueEn = (data.detail_value?.en ?? '').trim();
+      const valueAr = (data.detail_value?.ar ?? '').trim();
       const payload = {
         category_id: data.category_id,
         detail_key: { en: data.detail_key.en.trim(), ar: data.detail_key.ar.trim() },
-        detail_value: { en: data.detail_value.en.trim(), ar: data.detail_value.ar.trim() },
+        price: Number(data.price),
+        ...(valueEn || valueAr ? { detail_value: { en: valueEn, ar: valueAr } } : {}),
         is_active: data.is_active,
       };
 
@@ -261,7 +266,7 @@ export default function CreatePage() {
           <Box className="flex flex-col gap-1 px-6 py-4 border-b border-border/40 bg-gradient-to-r from-primary/[0.06] via-primary/[0.02] to-transparent sm:flex-row sm:items-start sm:gap-4">
             <Box className="flex items-start gap-3 min-w-0">
               <Box className="h-9 w-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 mt-0.5">
-                <Iconify icon="solar:key-bold" className="text-primary" width={17} />
+                <Iconify icon="solar:tag-bold" className="text-primary" width={17} />
               </Box>
               <Box className="min-w-0">
                 <Typography variant="subtitle1" className="font-bold text-foreground tracking-tight">
@@ -295,6 +300,31 @@ export default function CreatePage() {
                 className="transition-all duration-200"
               />
             </Box>
+          </Box>
+        </Box>
+
+        <Box className="rounded-2xl border border-border/50 bg-card/50 shadow-sm">
+          <Box className="flex items-center gap-3 px-6 py-4 border-b border-border/40 bg-gradient-to-r from-amber-500/[0.06] via-amber-500/[0.02] to-transparent">
+            <Box className="h-8 w-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+              <Iconify icon="solar:tag-price-bold" className="text-amber-600" width={15} />
+            </Box>
+            <Typography variant="subtitle2" className="font-semibold text-foreground">
+              {t('form.productExtraDetailPriceSection')}
+            </Typography>
+          </Box>
+          <Box className="p-6 max-w-md">
+            <Typography variant="subtitle2" className="font-semibold text-foreground mb-2">
+              {t('form.productExtraDetailPriceField')}
+            </Typography>
+            <RHFTextField
+              name="price"
+              type="number"
+              placeholder={t('form.productExtraDetailPricePlaceholder')}
+              className="transition-all duration-200"
+            />
+            <Typography variant="caption" className="text-muted-foreground block mt-2">
+              {t('form.productExtraDetailPriceHint')}
+            </Typography>
           </Box>
         </Box>
 
