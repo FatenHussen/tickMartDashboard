@@ -407,7 +407,6 @@ export function QuickOrderSettingsPanel({ settings }: QuickOrderSettingsPanelPro
 
       <FieldCard
         title={settingKeyLabel(t, 'quick_order_header_enabled')}
-        keyName="quick_order_header_enabled"
         seeded={has('quick_order_header_enabled')}
         notSeededLabel={t('form.quickOrderNotSeeded')}
       >
@@ -416,13 +415,11 @@ export function QuickOrderSettingsPanel({ settings }: QuickOrderSettingsPanelPro
           onChange={(e) => setHeaderEnabled(e.target.checked)}
           disabled={!has('quick_order_header_enabled') || saving}
           label={t('form.quickOrderHeaderEnabledLabel')}
-          helperText={t('form.quickOrderHeaderEnabledHelper')}
         />
       </FieldCard>
 
       <FieldCard
         title={settingKeyLabel(t, 'quick_order_enabled')}
-        keyName="quick_order_enabled"
         seeded={has('quick_order_enabled')}
         notSeededLabel={t('form.quickOrderNotSeeded')}
       >
@@ -431,13 +428,11 @@ export function QuickOrderSettingsPanel({ settings }: QuickOrderSettingsPanelPro
           onChange={(e) => setEnabled(e.target.checked)}
           disabled={!has('quick_order_enabled') || saving}
           label={t('form.quickOrderEnabledLabel')}
-          helperText={t('form.quickOrderEnabledHelper')}
         />
       </FieldCard>
 
       <FieldCard
         title={settingKeyLabel(t, 'quick_order_page_ids')}
-        keyName="quick_order_page_ids"
         seeded={has('quick_order_page_ids')}
         notSeededLabel={t('form.quickOrderNotSeeded')}
       >
@@ -458,13 +453,11 @@ export function QuickOrderSettingsPanel({ settings }: QuickOrderSettingsPanelPro
           }
           isDisabled={!has('quick_order_page_ids') || saving || pagesLoading}
           isSearchable
-          helperText={t('form.quickOrderPageIdsHelper')}
         />
       </FieldCard>
 
       <FieldCard
         title={settingKeyLabel(t, 'quick_order_background_image')}
-        keyName="quick_order_background_image"
         seeded={has('quick_order_background_image')}
         notSeededLabel={t('form.quickOrderNotSeeded')}
       >
@@ -480,9 +473,6 @@ export function QuickOrderSettingsPanel({ settings }: QuickOrderSettingsPanelPro
           </a>
         ) : null}
         <label className="flex cursor-pointer flex-col gap-2">
-          <Typography variant="caption" className="text-muted-foreground">
-            {t('form.settingsFileHelper')}
-          </Typography>
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp,image/jpg"
@@ -745,7 +735,7 @@ function FieldCard({
   children,
 }: {
   title: string;
-  keyName: string;
+  keyName?: string;
   seeded: boolean;
   notSeededLabel: string;
   children: React.ReactNode;
@@ -756,9 +746,11 @@ function FieldCard({
         <Typography variant="subtitle1" className="font-semibold">
           {title}
         </Typography>
-        <Typography variant="caption" className="font-mono text-muted-foreground">
-          {keyName}
-        </Typography>
+        {keyName ? (
+          <Typography variant="caption" className="font-mono text-muted-foreground">
+            {keyName}
+          </Typography>
+        ) : null}
         {!seeded && (
           <Typography variant="body2" className="mt-2 text-amber-700 dark:text-amber-300">
             {notSeededLabel}
