@@ -7,6 +7,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Iconify } from '@/shared/components/iconify';
 import { compressImage } from '@/utils/compress-image';
+import { isApiValidationError } from '@/api/errors';
 import { useParams, useNavigate, useLocation } from 'react-router';
 import { stripBilingualDescriptionForForm } from '@/utils/optional-bilingual-api-placeholder';
 import {
@@ -15,8 +16,9 @@ import {
   useFetchBannerById,
 } from '@/pages/dashboard/banners/hooks/banner';
 import {
+  BannerCreateSchema,
   BannerUpdateSchema,
-  type BannerUpdateFormValues,
+  type BannerFormValues,
 } from '@/pages/dashboard/banners/validation/banner.validation';
 
 import { paths } from 'src/routes/paths';
@@ -38,6 +40,31 @@ function apiDateTimeToLocalInput(iso: string | null | undefined): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function bilingualFromSource(
+  value: string | { en?: string; ar?: string } | null | undefined
+): { en: string; ar: string } {
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    return {
+      en: stripBilingualDescriptionForForm(value.en ?? ''),
+      ar: stripBilingualDescriptionForForm(value.ar ?? ''),
+    };
+  }
+  const str = typeof value === 'string' ? stripBilingualDescriptionForForm(value) : '';
+  return { en: str, ar: str };
+}
+
+const BANNER_FORM_PATHS = new Set([
+  'title.en',
+  'title.ar',
+  'description.en',
+  'description.ar',
+  'button_text.en',
+  'button_text.ar',
+  'link',
+  'expires_at',
+  'image',
+]);
+
 export default function CreatePage() {
   const { t } = useTranslation('table');
   const { id } = useParams<{ id?: string }>();
@@ -51,20 +78,21 @@ export default function CreatePage() {
   const createBannerMutation = useCreateBanner();
   const updateBannerMutation = useUpdateBanner();
 
-  const defaultValues: BannerUpdateFormValues = {
+  const defaultValues: BannerFormValues = {
     title: { en: '', ar: '' },
     description: { en: '', ar: '' },
+    button_text: { en: '', ar: '' },
     image: null,
     link: '',
     expires_at: '',
   };
 
-  const methods = useForm<BannerUpdateFormValues>({
-    resolver: zodResolver(BannerUpdateSchema) as any,
+  const methods = useForm<BannerFormValues>({
+    resolver: zodResolver(isEditMode ? BannerUpdateSchema : BannerCreateSchema) as any,
     defaultValues,
   });
 
-  const { handleSubmit, reset, control, watch } = methods;
+  const { handleSubmit, reset, control, watch, setError, clearErrors } = methods;
   const imageFile = watch('image');
 
   // Load banner data from state or API when in edit mode
@@ -72,23 +100,10 @@ export default function CreatePage() {
     const source = isEditMode ? (detailsResponse?.data ?? bannerFromState) : null;
     if (source) {
       setPreviewUrl(source.image_url || null);
-      const desc = source.description;
-      const descObj = typeof desc === 'object' && desc !== null && !Array.isArray(desc)
-        ? (desc as { en?: string; ar?: string })
-        : null;
-      const titleObj = typeof source.title === 'object' && source.title !== null
-        ? (source.title as { en?: string; ar?: string })
-        : null;
-      const titleStr = typeof source.title === 'string' ? source.title : '';
       reset({
-        title: {
-          en: titleObj?.en ?? titleStr,
-          ar: titleObj?.ar ?? titleStr,
-        },
-        description: {
-          en: stripBilingualDescriptionForForm(descObj?.en ?? ''),
-          ar: stripBilingualDescriptionForForm(descObj?.ar ?? ''),
-        },
+        title: bilingualFromSource(source.title),
+        description: bilingualFromSource(source.description as any),
+        button_text: bilingualFromSource(source.button_text),
         image: null,
         link: source.link ?? '',
         expires_at: apiDateTimeToLocalInput(source.expires_at ?? null),
@@ -116,15 +131,35 @@ export default function CreatePage() {
   const errorMessage =
     createBannerMutation.error?.message || updateBannerMutation.error?.message || null;
 
-  const onSubmit = async (data: BannerUpdateFormValues) => {
+  const applyServerFieldErrors = (error: unknown) => {
+    if (!isApiValidationError(error)) return;
+    for (const [field, messages] of Object.entries(error.fieldErrors)) {
+      const normalized = field.replace(/\[(\w+)\]/g, '.$1');
+      if (!BANNER_FORM_PATHS.has(normalized)) continue;
+      setError(normalized as any, {
+        type: 'server',
+        message: messages.join(' '),
+      });
+    }
+  };
+
+  const onSubmit = async (data: BannerFormValues) => {
+    clearErrors();
     try {
-      const payload = {
-        title: { en: data.title.en, ar: data.title.ar },
-        description: { en: data.description.en, ar: data.description.ar },
+      const payload: BannerFormValues = {
+        title: { en: data.title.en.trim(), ar: data.title.ar.trim() },
+        description: {
+          en: data.description.en.trim(),
+          ar: data.description.ar.trim(),
+        },
+        button_text: {
+          en: data.button_text.en.trim(),
+          ar: data.button_text.ar.trim(),
+        },
         image:
           data.image instanceof File ? await compressImage(data.image) : null,
-        link: data.link,
-        expires_at: data.expires_at?.trim() ?? '',
+        link: data.link.trim(),
+        expires_at: data.expires_at.trim(),
       };
 
       if (isEditMode && id) {
@@ -132,15 +167,12 @@ export default function CreatePage() {
         toast.success(t('form.bannerUpdatedSuccess'));
         navigate(paths.dashboard.banners);
       } else {
-        if (!(payload.image instanceof File)) {
-          toast.error(t('form.imageRequiredForNew'));
-          return;
-        }
         await createBannerMutation.mutateAsync(payload);
         toast.success(t('form.bannerCreatedSuccess'));
         navigate(paths.dashboard.banners);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      applyServerFieldErrors(error);
       console.error('Error saving banner:', error);
     }
   };
@@ -191,7 +223,7 @@ export default function CreatePage() {
               <Iconify icon="solar:letter-bold" className="text-primary" width={15} />
             </Box>
             <Typography variant="subtitle2" className="font-semibold text-foreground">
-              {t('form.bannerEnglishTitleLabel')} / {t('form.bannerArabicTitleLabel')}
+              {t('form.bannerEnglishTitleLabel')} / {t('form.bannerArabicTitleLabel')} *
             </Typography>
           </Box>
           <Box className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -199,7 +231,7 @@ export default function CreatePage() {
               <Box className="flex items-center gap-2 mb-2">
                 <Iconify icon="solar:letter-bold" className="text-primary" width={20} height={20} />
                 <Typography variant="subtitle2" className="font-semibold text-foreground">
-                  {t('form.bannerEnglishTitleLabel')}
+                  {t('form.bannerEnglishTitleLabel')} *
                 </Typography>
               </Box>
               <RHFTextField
@@ -214,7 +246,7 @@ export default function CreatePage() {
               <Box className="flex items-center gap-2 mb-2">
                 <Iconify icon="solar:letter-bold" className="text-primary" width={20} height={20} />
                 <Typography variant="subtitle2" className="font-semibold text-foreground">
-                  {t('form.bannerArabicTitleLabel')}
+                  {t('form.bannerArabicTitleLabel')} *
                 </Typography>
               </Box>
               <RHFTextField
@@ -235,7 +267,7 @@ export default function CreatePage() {
               <Iconify icon="solar:document-text-bold" className="text-violet-500" width={15} />
             </Box>
             <Typography variant="subtitle2" className="font-semibold text-foreground">
-              {t('form.descriptionEn')} / {t('form.descriptionAr')}
+              {t('form.descriptionEn')} / {t('form.descriptionAr')} *
             </Typography>
           </Box>
           <Box className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -243,12 +275,12 @@ export default function CreatePage() {
               <Box className="flex items-center gap-2 mb-2">
                 <Iconify icon="solar:document-text-bold" className="text-violet-500" width={20} height={20} />
                 <Typography variant="subtitle2" className="font-semibold text-foreground">
-                  {t('form.descriptionEn')}
+                  {t('form.descriptionEn')} *
                 </Typography>
               </Box>
               <RHFTextField
                 name="description.en"
-                placeholder={t('form.optionalDescription')}
+                placeholder={t('form.bannerDescEnPlaceholder')}
                 helperText={t('form.bannerDescHelper')}
                 className="transition-all duration-200"
               />
@@ -258,13 +290,57 @@ export default function CreatePage() {
               <Box className="flex items-center gap-2 mb-2">
                 <Iconify icon="solar:document-text-bold" className="text-violet-500" width={20} height={20} />
                 <Typography variant="subtitle2" className="font-semibold text-foreground">
-                  {t('form.descriptionAr')}
+                  {t('form.descriptionAr')} *
                 </Typography>
               </Box>
               <RHFTextField
                 name="description.ar"
-                placeholder={t('form.optionalDescription')}
+                placeholder={t('form.bannerDescArPlaceholder')}
                 helperText={t('form.bannerDescHelper')}
+                className="transition-all duration-200"
+                dir="rtl"
+              />
+            </Box>
+          </Box>
+        </Box>
+
+        {/* ── Section: Button text ── */}
+        <Box className="rounded-2xl border border-border/50 bg-card/50 shadow-sm">
+          <Box className="flex items-center gap-3 px-6 py-4 border-b border-border/40 bg-gradient-to-r from-emerald-500/[0.06] via-emerald-500/[0.02] to-transparent">
+            <Box className="h-8 w-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+              <Iconify icon="solar:cursor-bold" className="text-emerald-600 dark:text-emerald-400" width={15} />
+            </Box>
+            <Typography variant="subtitle2" className="font-semibold text-foreground">
+              {t('form.bannerButtonTextSection')} *
+            </Typography>
+          </Box>
+          <Box className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
+            <Box className="group">
+              <Box className="flex items-center gap-2 mb-2">
+                <Iconify icon="solar:cursor-bold" className="text-emerald-600 dark:text-emerald-400" width={20} height={20} />
+                <Typography variant="subtitle2" className="font-semibold text-foreground">
+                  {t('form.bannerButtonTextEnLabel')} *
+                </Typography>
+              </Box>
+              <RHFTextField
+                name="button_text.en"
+                placeholder={t('form.bannerButtonTextEnPlaceholder')}
+                helperText={t('form.bannerButtonTextHelper')}
+                className="transition-all duration-200"
+              />
+            </Box>
+
+            <Box className="group">
+              <Box className="flex items-center gap-2 mb-2">
+                <Iconify icon="solar:cursor-bold" className="text-emerald-600 dark:text-emerald-400" width={20} height={20} />
+                <Typography variant="subtitle2" className="font-semibold text-foreground">
+                  {t('form.bannerButtonTextArLabel')} *
+                </Typography>
+              </Box>
+              <RHFTextField
+                name="button_text.ar"
+                placeholder={t('form.bannerButtonTextArPlaceholder')}
+                helperText={t('form.bannerButtonTextHelper')}
                 className="transition-all duration-200"
                 dir="rtl"
               />
@@ -279,7 +355,7 @@ export default function CreatePage() {
               <Iconify icon="solar:gallery-add-bold" className="text-amber-500" width={15} />
             </Box>
             <Typography variant="subtitle2" className="font-semibold text-foreground">
-              {isEditMode ? t('form.bannerImageLabel') : t('form.bannerImageLabelRequired')}
+              {isEditMode ? t('form.bannerImageLabel') : `${t('form.bannerImageLabelRequired')} *`}
             </Typography>
           </Box>
           <Box className="p-6">
@@ -291,7 +367,7 @@ export default function CreatePage() {
                   <Input
                     {...field}
                     type="file"
-                    accept="image/*,video/*"
+                    accept="image/jpeg,image/png,image/jpg,image/gif,image/webp,video/mp4,video/quicktime,video/x-msvideo,video/webm,.mp4,.mov,.avi,.webm"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       onChange(file || null);
@@ -306,7 +382,7 @@ export default function CreatePage() {
                   />
                   {previewUrl && (
                     <Box className="mt-5">
-                      <Box className="relative inline-block">
+                      <Box className="relative inline-block w-full max-w-lg">
                         <Box className="absolute -inset-1 rounded-2xl bg-amber-500/20 blur-sm" />
                         {isVideoPreview ? (
                           <video
@@ -314,14 +390,14 @@ export default function CreatePage() {
                             controls
                             muted
                             playsInline
-                            className="relative w-full max-w-lg max-h-56 rounded-xl border border-border/60 bg-black shadow-sm"
+                            className="relative w-full aspect-[16/6] rounded-xl border border-border/60 bg-black shadow-sm object-contain"
                             aria-label={t('form.bannerPreviewAlt')}
                           />
                         ) : (
                           <img
                             src={previewUrl}
                             alt={t('form.bannerPreviewAlt')}
-                            className="relative w-full max-w-lg h-40 object-cover rounded-xl border border-border/60 shadow-sm"
+                            className="relative w-full aspect-[16/6] object-cover rounded-xl border border-border/60 shadow-sm"
                           />
                         )}
                       </Box>
@@ -340,7 +416,7 @@ export default function CreatePage() {
               <Iconify icon="solar:link-bold" className="text-sky-500" width={15} />
             </Box>
             <Typography variant="subtitle2" className="font-semibold text-foreground">
-              {t('form.linkLabelShort')} & {t('form.bannerExpiresAtLabel')}
+              {t('form.linkLabelShort')} & {t('form.bannerExpiresAtLabel')} *
             </Typography>
           </Box>
           <Box className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -348,7 +424,7 @@ export default function CreatePage() {
               <Box className="flex items-center gap-2 mb-2">
                 <Iconify icon="solar:link-bold" className="text-sky-500" width={20} height={20} />
                 <Typography variant="subtitle2" className="font-semibold text-foreground">
-                  {t('form.linkLabelShort')}
+                  {t('form.linkLabelShort')} *
                 </Typography>
               </Box>
               <RHFTextField
@@ -363,7 +439,7 @@ export default function CreatePage() {
               <Box className="flex items-center gap-2 mb-2">
                 <Iconify icon="solar:calendar-date-bold" className="text-sky-500" width={20} height={20} />
                 <Typography variant="subtitle2" className="font-semibold text-foreground">
-                  {t('form.bannerExpiresAtLabel')}
+                  {t('form.bannerExpiresAtLabel')} *
                 </Typography>
               </Box>
               <RHFTextField

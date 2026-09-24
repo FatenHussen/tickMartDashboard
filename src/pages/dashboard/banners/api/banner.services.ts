@@ -1,13 +1,20 @@
 import type { BannerItem, BannerFormValues, BannerListResponse } from '../types/banner.types';
 
 import { apiRoutes, axiosInstance } from '@/api';
-import { toApiBilingualDescription } from '@/utils/optional-bilingual-api-placeholder';
 import { couponLocalDateTimeToISO } from '@/pages/dashboard/coupons/validation/coupon.validation';
 
-function appendExpiresAt(formData: FormData, expiresAt: string | undefined) {
-  const v = expiresAt?.trim();
-  if (!v) return;
-  formData.append('expires_at', couponLocalDateTimeToISO(v));
+function appendBannerFields(formData: FormData, data: BannerFormValues) {
+  formData.append('title[en]', data.title.en.trim());
+  formData.append('title[ar]', data.title.ar.trim());
+  formData.append('description[en]', data.description.en.trim());
+  formData.append('description[ar]', data.description.ar.trim());
+  formData.append('button_text[en]', data.button_text.en.trim());
+  formData.append('button_text[ar]', data.button_text.ar.trim());
+  formData.append('link', data.link.trim());
+  formData.append('expires_at', couponLocalDateTimeToISO(data.expires_at.trim()));
+  if (data.image instanceof File) {
+    formData.append('image', data.image);
+  }
 }
 
 export const _BannerApi = {
@@ -22,19 +29,7 @@ export const _BannerApi = {
 
   createBanner: async (data: BannerFormValues): Promise<any> => {
     const formData = new FormData();
-    formData.append('title[en]', data.title.en);
-    formData.append('title[ar]', data.title.ar);
-    const { en: outEn, ar: outAr } = toApiBilingualDescription(
-      data.description?.en ?? '',
-      data.description?.ar ?? ''
-    );
-    formData.append('description[en]', outEn);
-    formData.append('description[ar]', outAr);
-    formData.append('link', data.link);
-    if (data.image instanceof File) {
-      formData.append('image', data.image);
-    }
-    appendExpiresAt(formData, data.expires_at);
+    appendBannerFields(formData, data);
 
     const response = await axiosInstance.post(apiRoutes.banner.create, formData, {
       headers: {
@@ -47,19 +42,7 @@ export const _BannerApi = {
   updateBanner: async (id: number | string, data: BannerFormValues): Promise<any> => {
     const formData = new FormData();
     formData.append('_method', 'PATCH');
-    formData.append('title[en]', data.title.en);
-    formData.append('title[ar]', data.title.ar);
-    const { en: outEn, ar: outAr } = toApiBilingualDescription(
-      data.description?.en ?? '',
-      data.description?.ar ?? ''
-    );
-    formData.append('description[en]', outEn);
-    formData.append('description[ar]', outAr);
-    formData.append('link', data.link);
-    if (data.image instanceof File) {
-      formData.append('image', data.image);
-    }
-    appendExpiresAt(formData, data.expires_at);
+    appendBannerFields(formData, data);
 
     const response = await axiosInstance.post(apiRoutes.banner.update(id), formData, {
       headers: {
