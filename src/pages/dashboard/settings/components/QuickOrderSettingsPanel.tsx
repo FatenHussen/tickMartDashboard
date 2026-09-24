@@ -21,6 +21,7 @@ import { MultiSelect } from 'src/shared/ui/multi-select';
 // ----------------------------------------------------------------------
 
 export const QUICK_ORDER_SETTING_KEYS = [
+  'quick_order_header_enabled',
   'quick_order_enabled',
   'quick_order_page_ids',
   'quick_order_background_image',
@@ -164,6 +165,7 @@ export function QuickOrderSettingsPanel({ settings }: QuickOrderSettingsPanelPro
 
   const has = (key: QuickOrderSettingKey) => byKey.has(key);
 
+  const [headerEnabled, setHeaderEnabled] = useState(true);
   const [enabled, setEnabled] = useState(true);
   const [pageIds, setPageIds] = useState<number[]>([]);
   const [bgColor, setBgColor] = useState('#FFE8D6');
@@ -205,6 +207,9 @@ export function QuickOrderSettingsPanel({ settings }: QuickOrderSettingsPanelPro
   );
 
   useEffect(() => {
+    const headerItem = byKey.get('quick_order_header_enabled');
+    if (headerItem) setHeaderEnabled(coerceBoolean(headerItem.value));
+
     const enabledItem = byKey.get('quick_order_enabled');
     if (enabledItem) setEnabled(coerceBoolean(enabledItem.value));
 
@@ -262,6 +267,13 @@ export function QuickOrderSettingsPanel({ settings }: QuickOrderSettingsPanelPro
     setSaving(true);
     try {
       const updates: Array<{ key: QuickOrderSettingKey; value: unknown; isFile?: boolean }> = [];
+
+      if (has('quick_order_header_enabled')) {
+        const current = byKey.get('quick_order_header_enabled')?.value;
+        if (!valuesEqual(coerceBoolean(current), headerEnabled)) {
+          updates.push({ key: 'quick_order_header_enabled', value: headerEnabled });
+        }
+      }
 
       if (has('quick_order_enabled')) {
         const current = byKey.get('quick_order_enabled')?.value;
@@ -392,6 +404,21 @@ export function QuickOrderSettingsPanel({ settings }: QuickOrderSettingsPanelPro
           {t('form.quickOrderPanelHint')}
         </Typography>
       </Box>
+
+      <FieldCard
+        title={settingKeyLabel(t, 'quick_order_header_enabled')}
+        keyName="quick_order_header_enabled"
+        seeded={has('quick_order_header_enabled')}
+        notSeededLabel={t('form.quickOrderNotSeeded')}
+      >
+        <Switch
+          checked={headerEnabled}
+          onChange={(e) => setHeaderEnabled(e.target.checked)}
+          disabled={!has('quick_order_header_enabled') || saving}
+          label={t('form.quickOrderHeaderEnabledLabel')}
+          helperText={t('form.quickOrderHeaderEnabledHelper')}
+        />
+      </FieldCard>
 
       <FieldCard
         title={settingKeyLabel(t, 'quick_order_enabled')}

@@ -18,9 +18,10 @@ export const ProductExtraDetailSchema = zod.object({
       required_error: t('productExtraDetail.priceRequired'),
     })
     .min(0, { message: t('productExtraDetail.priceMin') }),
+  /** Optional description — empty strings allowed (keep RHF input/output aligned). */
   detail_value: zod.object({
-    en: zod.string().optional().default(''),
-    ar: zod.string().optional().default(''),
+    en: zod.string(),
+    ar: zod.string(),
   }),
   is_active: zod.boolean(),
 });

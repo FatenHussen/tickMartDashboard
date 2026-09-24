@@ -7,30 +7,25 @@ const t = (key: string) => i18n.t(key, { ns: 'validation' });
 
 // ----------------------------------------------------------------------
 
-/** Optional bilingual object — empty strings allowed. */
+/** Optional bilingual — empty strings allowed (no `.optional()` to keep RHF input/output aligned). */
 const optionalBilingual = zod.object({
-  en: zod.string().optional().default(''),
-  ar: zod.string().optional().default(''),
+  en: zod.string(),
+  ar: zod.string(),
 });
 
 const imageField = zod
   .custom<File | null>((v) => v === null || v instanceof File)
-  .optional()
   .nullable();
 
 /** Optional URL: empty OK; if provided must be a valid URL. */
-const optionalLink = zod
-  .string()
-  .optional()
-  .default('')
-  .refine(
-    (v) => {
-      const s = String(v ?? '').trim();
-      if (!s) return true;
-      return zod.string().url().safeParse(s).success;
-    },
-    { message: t('banner.linkInvalid') }
-  );
+const optionalLink = zod.string().refine(
+  (v) => {
+    const s = String(v ?? '').trim();
+    if (!s) return true;
+    return zod.string().url().safeParse(s).success;
+  },
+  { message: t('banner.linkInvalid') }
+);
 
 const bannerBaseSchema = zod.object({
   title: optionalBilingual,
@@ -39,14 +34,14 @@ const bannerBaseSchema = zod.object({
   image: imageField,
   link: optionalLink,
   /** Empty = permanent banner (no auto-delete). */
-  expires_at: zod.string().optional().default(''),
+  expires_at: zod.string(),
 });
 
 function expiresAtFutureRefine(
-  data: { expires_at?: string },
+  data: { expires_at: string },
   ctx: zod.RefinementCtx
 ) {
-  const raw = (data.expires_at ?? '').trim();
+  const raw = data.expires_at.trim();
   if (!raw) return; // empty = permanent
 
   const parsed = parseCouponDateTimeLocal(raw);
@@ -72,6 +67,7 @@ export const BannerCreateSchema = bannerBaseSchema
   .extend({
     image: zod
       .custom<File | null>((v) => v === null || v instanceof File)
+      .nullable()
       .refine((v) => v instanceof File, { message: t('banner.imageRequired') }),
   })
   .superRefine(expiresAtFutureRefine);
