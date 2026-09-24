@@ -6,10 +6,11 @@ export interface BannerItem {
   description: string | { en?: string; ar?: string } | any[] | null;
   button_text?: string | { en?: string; ar?: string } | null;
   image_url: string;
-  link?: string;
+  link?: string | null;
   is_active: number;
   order: number;
   created_at: string;
+  /** null / missing = permanent banner */
   expires_at?: string | null;
 }
 
@@ -27,31 +28,7 @@ export interface BannerListResponse {
   };
 }
 
-export interface BannerCreatePayload {
-  'title.en': string;
-  'title.ar': string;
-  'description.en': string;
-  'description.ar': string;
-  'button_text.en': string;
-  'button_text.ar': string;
-  image: File;
-  link: string;
-  expires_at: string;
-}
-
-export interface BannerUpdatePayload {
-  _method: 'PATCH';
-  'title.en': string;
-  'title.ar': string;
-  'description.en': string;
-  'description.ar': string;
-  'button_text.en': string;
-  'button_text.ar': string;
-  image?: File;
-  link: string;
-  expires_at: string;
-}
-
+/** Form values — all optional except `image` required on create (enforced by Zod). */
 export interface BannerFormValues {
   title: {
     en: string;
@@ -67,6 +44,6 @@ export interface BannerFormValues {
   };
   image: File | null;
   link: string;
-  /** `datetime-local` value in the form; sent to API as ISO via services */
+  /** `datetime-local` value; empty = permanent (null on API) */
   expires_at: string;
 }

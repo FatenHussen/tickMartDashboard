@@ -223,7 +223,7 @@ export default function CreatePage() {
               <Iconify icon="solar:letter-bold" className="text-primary" width={15} />
             </Box>
             <Typography variant="subtitle2" className="font-semibold text-foreground">
-              {t('form.bannerEnglishTitleLabel')} / {t('form.bannerArabicTitleLabel')} *
+              {t('form.bannerEnglishTitleLabel')} / {t('form.bannerArabicTitleLabel')}
             </Typography>
           </Box>
           <Box className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -231,7 +231,7 @@ export default function CreatePage() {
               <Box className="flex items-center gap-2 mb-2">
                 <Iconify icon="solar:letter-bold" className="text-primary" width={20} height={20} />
                 <Typography variant="subtitle2" className="font-semibold text-foreground">
-                  {t('form.bannerEnglishTitleLabel')} *
+                  {t('form.bannerEnglishTitleLabel')}
                 </Typography>
               </Box>
               <RHFTextField
@@ -246,7 +246,7 @@ export default function CreatePage() {
               <Box className="flex items-center gap-2 mb-2">
                 <Iconify icon="solar:letter-bold" className="text-primary" width={20} height={20} />
                 <Typography variant="subtitle2" className="font-semibold text-foreground">
-                  {t('form.bannerArabicTitleLabel')} *
+                  {t('form.bannerArabicTitleLabel')}
                 </Typography>
               </Box>
               <RHFTextField
@@ -267,7 +267,7 @@ export default function CreatePage() {
               <Iconify icon="solar:document-text-bold" className="text-violet-500" width={15} />
             </Box>
             <Typography variant="subtitle2" className="font-semibold text-foreground">
-              {t('form.descriptionEn')} / {t('form.descriptionAr')} *
+              {t('form.descriptionEn')} / {t('form.descriptionAr')}
             </Typography>
           </Box>
           <Box className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -275,7 +275,7 @@ export default function CreatePage() {
               <Box className="flex items-center gap-2 mb-2">
                 <Iconify icon="solar:document-text-bold" className="text-violet-500" width={20} height={20} />
                 <Typography variant="subtitle2" className="font-semibold text-foreground">
-                  {t('form.descriptionEn')} *
+                  {t('form.descriptionEn')}
                 </Typography>
               </Box>
               <RHFTextField
@@ -290,7 +290,7 @@ export default function CreatePage() {
               <Box className="flex items-center gap-2 mb-2">
                 <Iconify icon="solar:document-text-bold" className="text-violet-500" width={20} height={20} />
                 <Typography variant="subtitle2" className="font-semibold text-foreground">
-                  {t('form.descriptionAr')} *
+                  {t('form.descriptionAr')}
                 </Typography>
               </Box>
               <RHFTextField
@@ -311,7 +311,7 @@ export default function CreatePage() {
               <Iconify icon="solar:cursor-bold" className="text-emerald-600 dark:text-emerald-400" width={15} />
             </Box>
             <Typography variant="subtitle2" className="font-semibold text-foreground">
-              {t('form.bannerButtonTextSection')} *
+              {t('form.bannerButtonTextSection')}
             </Typography>
           </Box>
           <Box className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -319,7 +319,7 @@ export default function CreatePage() {
               <Box className="flex items-center gap-2 mb-2">
                 <Iconify icon="solar:cursor-bold" className="text-emerald-600 dark:text-emerald-400" width={20} height={20} />
                 <Typography variant="subtitle2" className="font-semibold text-foreground">
-                  {t('form.bannerButtonTextEnLabel')} *
+                  {t('form.bannerButtonTextEnLabel')}
                 </Typography>
               </Box>
               <RHFTextField
@@ -334,7 +334,7 @@ export default function CreatePage() {
               <Box className="flex items-center gap-2 mb-2">
                 <Iconify icon="solar:cursor-bold" className="text-emerald-600 dark:text-emerald-400" width={20} height={20} />
                 <Typography variant="subtitle2" className="font-semibold text-foreground">
-                  {t('form.bannerButtonTextArLabel')} *
+                  {t('form.bannerButtonTextArLabel')}
                 </Typography>
               </Box>
               <RHFTextField
@@ -416,7 +416,7 @@ export default function CreatePage() {
               <Iconify icon="solar:link-bold" className="text-sky-500" width={15} />
             </Box>
             <Typography variant="subtitle2" className="font-semibold text-foreground">
-              {t('form.linkLabelShort')} & {t('form.bannerExpiresAtLabel')} *
+              {t('form.linkLabelShort')} & {t('form.bannerExpiresAtLabel')}
             </Typography>
           </Box>
           <Box className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -424,7 +424,7 @@ export default function CreatePage() {
               <Box className="flex items-center gap-2 mb-2">
                 <Iconify icon="solar:link-bold" className="text-sky-500" width={20} height={20} />
                 <Typography variant="subtitle2" className="font-semibold text-foreground">
-                  {t('form.linkLabelShort')} *
+                  {t('form.linkLabelShort')}
                 </Typography>
               </Box>
               <RHFTextField
@@ -439,7 +439,7 @@ export default function CreatePage() {
               <Box className="flex items-center gap-2 mb-2">
                 <Iconify icon="solar:calendar-date-bold" className="text-sky-500" width={20} height={20} />
                 <Typography variant="subtitle2" className="font-semibold text-foreground">
-                  {t('form.bannerExpiresAtLabel')} *
+                  {t('form.bannerExpiresAtLabel')}
                 </Typography>
               </Box>
               <RHFTextField

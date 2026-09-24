@@ -7,19 +7,10 @@ const t = (key: string) => i18n.t(key, { ns: 'validation' });
 
 // ----------------------------------------------------------------------
 
-const titleShape = zod.object({
-  en: zod.string().min(1, { message: t('banner.titleEnRequired') }),
-  ar: zod.string().min(1, { message: t('banner.titleArRequired') }),
-});
-
-const descriptionShape = zod.object({
-  en: zod.string().min(1, { message: t('banner.descriptionEnRequired') }),
-  ar: zod.string().min(1, { message: t('banner.descriptionArRequired') }),
-});
-
-const buttonTextShape = zod.object({
-  en: zod.string().min(1, { message: t('banner.buttonTextEnRequired') }),
-  ar: zod.string().min(1, { message: t('banner.buttonTextArRequired') }),
+/** Optional bilingual object — empty strings allowed. */
+const optionalBilingual = zod.object({
+  en: zod.string().optional().default(''),
+  ar: zod.string().optional().default(''),
 });
 
 const imageField = zod
@@ -27,27 +18,42 @@ const imageField = zod
   .optional()
   .nullable();
 
+/** Optional URL: empty OK; if provided must be a valid URL. */
+const optionalLink = zod
+  .string()
+  .optional()
+  .default('')
+  .refine(
+    (v) => {
+      const s = String(v ?? '').trim();
+      if (!s) return true;
+      return zod.string().url().safeParse(s).success;
+    },
+    { message: t('banner.linkInvalid') }
+  );
+
 const bannerBaseSchema = zod.object({
-  title: titleShape,
-  description: descriptionShape,
-  button_text: buttonTextShape,
+  title: optionalBilingual,
+  description: optionalBilingual,
+  button_text: optionalBilingual,
   image: imageField,
-  link: zod
-    .string()
-    .min(1, { message: t('banner.linkRequired') })
-    .url({ message: t('banner.linkInvalid') }),
-  expires_at: zod.string().min(1, { message: t('banner.expiresAtRequired') }),
+  link: optionalLink,
+  /** Empty = permanent banner (no auto-delete). */
+  expires_at: zod.string().optional().default(''),
 });
 
 function expiresAtFutureRefine(
-  data: { expires_at: string },
+  data: { expires_at?: string },
   ctx: zod.RefinementCtx
 ) {
-  const parsed = parseCouponDateTimeLocal(data.expires_at);
+  const raw = (data.expires_at ?? '').trim();
+  if (!raw) return; // empty = permanent
+
+  const parsed = parseCouponDateTimeLocal(raw);
   if (!parsed) {
     ctx.addIssue({
       code: 'custom',
-      message: t('banner.expiresAtRequired'),
+      message: t('banner.expiresAtFuture'),
       path: ['expires_at'],
     });
     return;
@@ -61,7 +67,7 @@ function expiresAtFutureRefine(
   }
 }
 
-/** Create: all text fields + link + expires_at + image required. */
+/** Create: image required; all other fields optional. */
 export const BannerCreateSchema = bannerBaseSchema
   .extend({
     image: zod
@@ -70,7 +76,7 @@ export const BannerCreateSchema = bannerBaseSchema
   })
   .superRefine(expiresAtFutureRefine);
 
-/** Update: same required fields; image optional if unchanged. */
+/** Update: all fields optional (including image if unchanged). */
 export const BannerUpdateSchema = bannerBaseSchema.superRefine(expiresAtFutureRefine);
 
 /** @deprecated Prefer BannerCreateSchema / BannerUpdateSchema */
