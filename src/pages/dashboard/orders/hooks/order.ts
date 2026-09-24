@@ -1,9 +1,15 @@
-import type { AssignDriverPayload, ChangeItemStatusPayload, ChangeOrderStatusPayload } from '../types/order.types';
+import type {
+  AssignDriverPayload,
+  ChangeItemStatusPayload,
+  ChangeOrderStatusPayload,
+  OrderDetailsResponse,
+} from '../types/order.types';
 
 import { queryKeys } from '@/api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { _OrderApi } from '../api/order.services';
+import { parseOrderStatus } from '../types/order.types';
 
 export const useFetchOrders = (
   page: number = 1,
@@ -57,10 +63,26 @@ export const useChangeOrderStatus = () => {
       /** Use this for refetch to match the query key (e.g. route param string) */
       queryId?: number | string;
     }) => _OrderApi.changeOrderStatus(id, data),
-    onSuccess: async (_, variables) => {
+    onSuccess: async (response, variables) => {
       queryClient.invalidateQueries({ queryKey: ['order', 'list'] });
       const refetchId = variables.queryId ?? variables.id;
-      await queryClient.refetchQueries({ queryKey: queryKeys.order.details(refetchId) });
+      const detailsKey = queryKeys.order.details(refetchId);
+      // Prefer `data.status` / `data.status_label` — never the root success boolean.
+      const nextStatus = parseOrderStatus(response?.data?.status);
+      if (nextStatus) {
+        queryClient.setQueryData<OrderDetailsResponse>(detailsKey, (old) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: {
+              ...old.data,
+              status: nextStatus,
+              status_label: response.data.status_label ?? old.data.status_label,
+            },
+          };
+        });
+      }
+      await queryClient.refetchQueries({ queryKey: detailsKey });
     },
   });
 };

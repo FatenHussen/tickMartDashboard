@@ -7,11 +7,13 @@ const t = (key: string) => i18n.t(key, { ns: 'validation' });
 export const ChangeOrderStatusSchema = z.object({
   status: z.enum([
     'pending',
+    'waiting_approval',
     'preparing',
     'out_delivery',
     'delivered',
     'cancelled',
     'cancelled_by_admin',
+    'rejected_by_delivery',
     'faild_deliver',
     'returned_by_user',
   ]),

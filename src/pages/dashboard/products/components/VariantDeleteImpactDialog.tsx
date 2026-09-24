@@ -20,12 +20,17 @@ const PRESERVED_KEYS = new Set(['active_orders', 'past_orders', 'images']);
 
 const ORDER_STATUS_I18N: Record<string, string> = {
   pending: 'statusPending',
+  waiting_approval: 'statusWaitingApproval',
   preparing: 'statusPreparing',
   out_delivery: 'statusOutDelivery',
+  out_for_delivery: 'statusOutDelivery',
   delivered: 'statusDelivered',
   cancelled: 'statusCancelled',
   cancelled_by_admin: 'statusCancelledByAdmin',
+  rejected_by_delivery: 'statusRejectedByDelivery',
   rejected: 'statusRejected',
+  faild_deliver: 'statusFaildDeliver',
+  returned_by_user: 'statusReturnedByUser',
 };
 
 const COUNT_I18N_KEYS = [

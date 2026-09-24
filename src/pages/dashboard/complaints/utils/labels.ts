@@ -1,10 +1,29 @@
 import type { TFunction } from 'i18next';
 
-const ORDER_STATUS_TABLE_KEYS: Record<string, 'statusPending' | 'statusPreparing' | 'statusOutDelivery' | 'statusDelivered'> = {
+const ORDER_STATUS_TABLE_KEYS: Record<
+  string,
+  | 'statusPending'
+  | 'statusWaitingApproval'
+  | 'statusPreparing'
+  | 'statusOutDelivery'
+  | 'statusDelivered'
+  | 'statusCancelled'
+  | 'statusCancelledByAdmin'
+  | 'statusRejectedByDelivery'
+  | 'statusFaildDeliver'
+  | 'statusReturnedByUser'
+> = {
   pending: 'statusPending',
+  waiting_approval: 'statusWaitingApproval',
   preparing: 'statusPreparing',
   out_delivery: 'statusOutDelivery',
+  out_for_delivery: 'statusOutDelivery',
   delivered: 'statusDelivered',
+  cancelled: 'statusCancelled',
+  cancelled_by_admin: 'statusCancelledByAdmin',
+  rejected_by_delivery: 'statusRejectedByDelivery',
+  faild_deliver: 'statusFaildDeliver',
+  returned_by_user: 'statusReturnedByUser',
 };
 
 export function translateComplaintOrderStatus(status: string, t: TFunction<'table'>): string {

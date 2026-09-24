@@ -10,6 +10,7 @@ import { DataTableColumnHeader } from '@/shared/ui/table-data/data-table-column-
 import {
   type OrderData,
   type OrderStatus,
+  parseOrderStatus,
   normalizeOrderStatus,
 } from '@/pages/dashboard/orders/types/order.types';
 import {
@@ -43,6 +44,10 @@ const ORDER_STATUS_BADGE: Record<
     icon: 'solar:hourglass-bold',
     className: 'border-amber-700 bg-amber-500',
   },
+  waiting_approval: {
+    icon: 'solar:hand-heart-bold',
+    className: 'border-sky-800 bg-sky-600',
+  },
   preparing: {
     icon: 'solar:chef-hat-bold',
     className: 'border-sky-800 bg-sky-600',
@@ -60,13 +65,15 @@ const ORDER_STATUS_BADGE: Record<
     className: 'border-slate-700 bg-slate-600',
   },
   cancelled_by_admin: {
-
     icon: 'solar:shield-cross-bold',
     className: 'border-rose-800 bg-rose-600',
   },
+  rejected_by_delivery: {
+    icon: 'solar:delivery-bold',
+    className: 'border-orange-800 bg-orange-600',
+  },
   faild_deliver: {
     icon: 'solar:danger-triangle-bold',
-
     className: 'border-orange-800 bg-orange-600',
   },
   returned_by_user: {
@@ -75,14 +82,21 @@ const ORDER_STATUS_BADGE: Record<
   },
 };
 
-function getOrderStatusLabel(status: OrderStatus, t: TFunction<'table'>): string {
+function getOrderStatusLabel(
+  status: OrderStatus,
+  t: TFunction<'table'>,
+  statusLabel?: string | null
+): string {
+  if (statusLabel?.trim()) return statusLabel.trim();
   const labels: Record<OrderStatus, string> = {
     pending: t('statusPending'),
+    waiting_approval: t('statusWaitingApproval'),
     preparing: t('statusPreparing'),
     out_delivery: t('statusOutDelivery'),
     delivered: t('statusDelivered'),
     cancelled: t('statusCancelled'),
     cancelled_by_admin: t('statusCancelledByAdmin'),
+    rejected_by_delivery: t('statusRejectedByDelivery'),
     faild_deliver: t('statusFaildDeliver'),
     returned_by_user: t('statusReturnedByUser'),
   };
@@ -100,6 +114,7 @@ function toNum(v: unknown): number {
 const ORDER_CANCELLED_STATES: OrderStatus[] = [
   'cancelled',
   'cancelled_by_admin',
+  'rejected_by_delivery',
   'faild_deliver',
   'returned_by_user',
 ];
@@ -233,11 +248,25 @@ export const orderColumns = (
     accessorKey: 'status',
     header: ({ column }) => <DataTableColumnHeader column={column} title={t('columns.status')} />,
     cell: ({ row }) => {
-      const n = normalizeOrderStatus(row.original.status);
-      const cfg = ORDER_STATUS_BADGE[n] ?? ORDER_STATUS_BADGE.pending;
+      const raw = row.original.status;
+      const labelFromApi = row.original.status_label;
+      const parsed = parseOrderStatus(raw);
+      if (!parsed) {
+        return (
+          <TableTonedStatusPill
+            icon="solar:info-circle-bold"
+            className="border-slate-600 bg-slate-500"
+          >
+            {labelFromApi?.trim() || (raw != null && String(raw).trim() !== ''
+              ? String(raw).replace(/_/g, ' ')
+              : t('statusPending'))}
+          </TableTonedStatusPill>
+        );
+      }
+      const cfg = ORDER_STATUS_BADGE[parsed];
       return (
         <TableTonedStatusPill icon={cfg.icon} className={cfg.className}>
-          {getOrderStatusLabel(n, t)}
+          {getOrderStatusLabel(parsed, t, labelFromApi)}
         </TableTonedStatusPill>
       );
     },

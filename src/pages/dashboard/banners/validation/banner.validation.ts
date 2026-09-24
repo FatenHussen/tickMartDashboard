@@ -1,7 +1,7 @@
 import { z as zod } from 'zod';
+import { parseCouponDateTimeLocal } from '@/pages/dashboard/coupons/validation/coupon.validation';
 
 import i18n from 'src/lib/i18n';
-import { parseCouponDateTimeLocal } from '@/pages/dashboard/coupons/validation/coupon.validation';
 
 const t = (key: string) => i18n.t(key, { ns: 'validation' });
 

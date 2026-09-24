@@ -104,22 +104,26 @@ export default function Page() {
 
   const statusChipIcons: Record<OrderStatus, string> = {
     pending: 'solar:hourglass-bold',
+    waiting_approval: 'solar:hand-heart-bold',
     preparing: 'solar:chef-hat-bold',
     out_delivery: 'solar:delivery-bold',
     delivered: 'solar:check-circle-bold',
     cancelled: 'solar:close-circle-bold',
     cancelled_by_admin: 'solar:shield-warning-bold',
+    rejected_by_delivery: 'solar:delivery-bold',
     faild_deliver: 'solar:danger-bold',
     returned_by_user: 'solar:undo-left-bold',
   };
 
   const statusChipLabelKeys: Record<OrderStatus, string> = {
     pending: 'statusPending',
+    waiting_approval: 'statusWaitingApproval',
     preparing: 'statusPreparing',
     out_delivery: 'statusOutDelivery',
     delivered: 'statusDelivered',
     cancelled: 'statusCancelled',
     cancelled_by_admin: 'statusCancelledByAdmin',
+    rejected_by_delivery: 'statusRejectedByDelivery',
     faild_deliver: 'statusFaildDeliver',
     returned_by_user: 'statusReturnedByUser',
   };

@@ -5,6 +5,7 @@ import type {
   OrdersToAssignResponse,
   ChangeItemStatusPayload,
   ChangeOrderStatusPayload,
+  ChangeOrderStatusResponse,
 } from '../types/order.types';
 
 import { apiRoutes, axiosInstance } from '@/api';
@@ -95,8 +96,11 @@ export const _OrderApi = {
   changeOrderStatus: async (
     id: number | string,
     data: ChangeOrderStatusPayload
-  ): Promise<any> => {
-    const response = await axiosInstance.patch(apiRoutes.order.changeStatus(id), data);
+  ): Promise<ChangeOrderStatusResponse> => {
+    const response = await axiosInstance.patch<ChangeOrderStatusResponse>(
+      apiRoutes.order.changeStatus(id),
+      data
+    );
     return response.data;
   },
 

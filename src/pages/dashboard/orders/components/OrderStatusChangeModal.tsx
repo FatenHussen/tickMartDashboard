@@ -9,18 +9,19 @@ import {
   normalizeOrderStatus,
   ORDER_STATUS_PIPELINE,
   getUpcomingOrderStatuses,
+  getAllowedOrderStatusTransitions,
 } from '@/pages/dashboard/orders/types/order.types';
 
 const STATUS_ICONS: Record<OrderStatus, string> = {
   pending: 'solar:hourglass-bold',
+  waiting_approval: 'solar:hand-heart-bold',
   preparing: 'solar:chef-hat-bold',
   out_delivery: 'solar:delivery-bold',
   delivered: 'solar:check-circle-bold',
   cancelled: 'solar:close-circle-bold',
-
   cancelled_by_admin: 'solar:shield-cross-bold',
+  rejected_by_delivery: 'solar:delivery-bold',
   faild_deliver: 'solar:danger-triangle-bold',
-
   returned_by_user: 'solar:undo-left-bold',
 };
 
@@ -53,6 +54,8 @@ export function OrderStatusChangeModal({
 }: Props) {
   const current = normalizeOrderStatus(currentStatusRaw);
   const upcoming = getUpcomingOrderStatuses(current);
+  const transitionOptions = getAllowedOrderStatusTransitions(current);
+  const selectOptions = upcoming.length > 0 ? upcoming : transitionOptions;
   const pipelineIdx = ORDER_STATUS_PIPELINE.indexOf(current);
   const inPipeline = pipelineIdx >= 0;
 
@@ -171,14 +174,14 @@ export function OrderStatusChangeModal({
             </div>
           </div>
 
-          {upcoming.length > 0 ? (
+          {selectOptions.length > 0 ? (
             <div className="mt-6">
               <SimpleSelect
                 label={t('newOrderStatusLabel')}
                 fullWidth
                 value={chosenStatus}
                 onChange={(v) => onChosenStatus(v as OrderStatus)}
-                options={upcoming.map((s) => ({
+                options={selectOptions.map((s) => ({
                   value: s,
                   label: orderStatusLabel(s),
                 }))}
@@ -201,8 +204,8 @@ export function OrderStatusChangeModal({
               onClick={() => void onApply()}
               disabled={
                 isBusy ||
-                upcoming.length === 0 ||
-                !upcoming.includes(chosenStatus) ||
+                selectOptions.length === 0 ||
+                !selectOptions.includes(chosenStatus) ||
                 chosenStatus === current
               }
             >

@@ -22,9 +22,9 @@ import {
 } from '@/pages/dashboard/orders/hooks/order';
 import {
   type OrderStatus,
-  normalizeOrderStatus,
-  ORDER_STATUS_OPTIONS,
+  parseOrderStatus,
   orderStatusBlocksAssignDriver,
+  getAllowedOrderStatusTransitions,
 } from '@/pages/dashboard/orders/types/order.types';
 
 import { CONFIG } from 'src/global-config';
@@ -36,28 +36,43 @@ import OrderTrackingMap from '../components/OrderTrackingMap';
 
 const statusColors: Record<OrderStatus, string> = {
   pending: 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400',
+  waiting_approval: 'bg-sky-500/20 text-sky-700 dark:text-sky-300',
   preparing: 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
   out_delivery: 'bg-purple-500/20 text-purple-600 dark:text-purple-400',
   delivered: 'bg-green-500/20 text-green-600 dark:text-green-400',
   cancelled: 'bg-muted text-muted-foreground',
   cancelled_by_admin: 'bg-rose-500/15 text-rose-700 dark:text-rose-400',
+  rejected_by_delivery: 'bg-orange-500/15 text-orange-700 dark:text-orange-300',
   faild_deliver: 'bg-orange-500/15 text-orange-800 dark:text-orange-300',
   returned_by_user: 'bg-cyan-500/15 text-cyan-800 dark:text-cyan-300',
 };
 
-function getOrderStatusLabel(statusRaw: string, t: (key: string) => string): string {
-  const status = normalizeOrderStatus(statusRaw);
-  const labels: Record<OrderStatus, string> = {
-    pending: t('statusPending'),
-    preparing: t('statusPreparing'),
-    out_delivery: t('statusOutDelivery'),
-    delivered: t('statusDelivered'),
-    cancelled: t('statusCancelled'),
-    cancelled_by_admin: t('statusCancelledByAdmin'),
-    faild_deliver: t('statusFaildDeliver'),
-    returned_by_user: t('statusReturnedByUser'),
-  };
-  return labels[status] ?? status.replace(/_/g, ' ');
+const ORDER_STATUS_I18N: Record<OrderStatus, string> = {
+  pending: 'statusPending',
+  waiting_approval: 'statusWaitingApproval',
+  preparing: 'statusPreparing',
+  out_delivery: 'statusOutDelivery',
+  delivered: 'statusDelivered',
+  cancelled: 'statusCancelled',
+  cancelled_by_admin: 'statusCancelledByAdmin',
+  rejected_by_delivery: 'statusRejectedByDelivery',
+  faild_deliver: 'statusFaildDeliver',
+  returned_by_user: 'statusReturnedByUser',
+};
+
+/** Prefer API `status_label`; never map unknown keys to pending for display. */
+function getOrderStatusLabel(
+  statusRaw: string | undefined | null,
+  t: (key: string) => string,
+  statusLabel?: string | null
+): string {
+  if (statusLabel?.trim()) return statusLabel.trim();
+  const parsed = parseOrderStatus(statusRaw);
+  if (parsed) return t(ORDER_STATUS_I18N[parsed]);
+  if (statusRaw != null && String(statusRaw).trim() !== '') {
+    return String(statusRaw).replace(/_/g, ' ');
+  }
+  return t('statusPending');
 }
 
 const formatDate = (dateStr: string | null | undefined) => {
@@ -132,11 +147,12 @@ export default function DetailsPage() {
 
   useEffect(() => {
     if (!order) return;
-    setStatusDraft(normalizeOrderStatus(order.status));
+    const parsed = parseOrderStatus(order.status);
+    if (parsed) setStatusDraft(parsed);
   }, [order?.id, order?.status]);
 
   // Live order tracking via socket
-  const isTrackable = order ? normalizeOrderStatus(order.status) === 'out_delivery' : false;
+  const isTrackable = order ? parseOrderStatus(order.status) === 'out_delivery' : false;
   const liveLocation = useOrderLocation(isTrackable ? order?.id ?? null : null);
 
   useEffect(() => {
@@ -185,11 +201,22 @@ export default function DetailsPage() {
     );
   }
 
-  const normalizedOrderStatus = normalizeOrderStatus(order.status);
-  const canAssignDriver = !orderStatusBlocksAssignDriver(normalizedOrderStatus);
+  const parsedOrderStatus = parseOrderStatus(order.status);
+  const normalizedOrderStatus = parsedOrderStatus ?? 'pending';
+  const canAssignDriver =
+    parsedOrderStatus != null && !orderStatusBlocksAssignDriver(parsedOrderStatus);
+  const allowedNextStatuses =
+    parsedOrderStatus != null ? getAllowedOrderStatusTransitions(parsedOrderStatus) : [];
+  const statusSelectOptions: OrderStatus[] =
+    parsedOrderStatus != null
+      ? [parsedOrderStatus, ...allowedNextStatuses.filter((s) => s !== parsedOrderStatus)]
+      : [];
 
   const handleChangeStatus = async (status: OrderStatus) => {
+    if (!parsedOrderStatus) return;
+    const previous = parsedOrderStatus;
     try {
+      // Always send the canonical API key (e.g. out_delivery, never out_for_delivery / Arabic).
       await changeStatusMutation.mutateAsync({
         id: order.id,
         data: { status },
@@ -197,14 +224,19 @@ export default function DetailsPage() {
       });
       toast.success(t('statusChangedSuccess'));
     } catch {
-      return;
+      // On 400/422 keep the previous status — do not fall back to pending.
+      setStatusDraft(previous);
     }
   };
 
   const handleApplyOrderStatus = () => {
-    const current = normalizeOrderStatus(order.status);
-    if (statusDraft === current) {
+    if (!parsedOrderStatus) return;
+    if (statusDraft === parsedOrderStatus) {
       toast.info(t('orders.sameOrderStatus'));
+      return;
+    }
+    if (!allowedNextStatuses.includes(statusDraft)) {
+      setStatusDraft(parsedOrderStatus);
       return;
     }
     if (statusDraft === 'cancelled_by_admin') {
@@ -247,7 +279,10 @@ export default function DetailsPage() {
 
       <RejectOrderModal
         open={rejectModalOpen}
-        onClose={() => setRejectModalOpen(false)}
+        onClose={() => {
+          setRejectModalOpen(false);
+          setStatusDraft(normalizedOrderStatus);
+        }}
         order={order as unknown as OrderFormValues}
         t={t}
         queryId={id}
@@ -290,7 +325,7 @@ export default function DetailsPage() {
               <span
                 className={`inline-flex w-fit shrink-0 items-center rounded-full px-3 py-1.5 text-sm font-medium capitalize ${statusColors[normalizedOrderStatus] ?? 'bg-muted text-muted-foreground'}`}
               >
-                {getOrderStatusLabel(order.status, t)}
+                {getOrderStatusLabel(order.status, t, order.status_label)}
               </span>
             </Box>
           </Box>
@@ -303,7 +338,7 @@ export default function DetailsPage() {
                   <span
                     className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${statusColors[normalizedOrderStatus] ?? 'bg-muted text-muted-foreground'}`}
                   >
-                    {getOrderStatusLabel(order.status, t)}
+                    {getOrderStatusLabel(order.status, t, order.status_label)}
                   </span>
                   <Typography variant="caption" className="text-muted-foreground">
                     {t('orders.changeOrderStatusHint')}
@@ -317,10 +352,14 @@ export default function DetailsPage() {
                     <select
                       value={statusDraft}
                       onChange={(e) => setStatusDraft(e.target.value as OrderStatus)}
-                      disabled={changeStatusMutation.isPending}
+                      disabled={
+                        changeStatusMutation.isPending ||
+                        !parsedOrderStatus ||
+                        allowedNextStatuses.length === 0
+                      }
                       className="h-10 w-full max-w-md rounded-lg border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 disabled:opacity-50"
                     >
-                      {ORDER_STATUS_OPTIONS.map((s) => (
+                      {statusSelectOptions.map((s) => (
                         <option key={s} value={s}>
                           {getOrderStatusLabel(s, t)}
                         </option>
@@ -331,7 +370,12 @@ export default function DetailsPage() {
                     type="button"
                     variant="contained"
                     onClick={handleApplyOrderStatus}
-                    disabled={changeStatusMutation.isPending || statusDraft === normalizedOrderStatus}
+                    disabled={
+                      changeStatusMutation.isPending ||
+                      !parsedOrderStatus ||
+                      statusDraft === parsedOrderStatus ||
+                      allowedNextStatuses.length === 0
+                    }
                     className="w-full shrink-0 sm:w-auto"
                   >
                     {changeStatusMutation.isPending ? t('orders.updatingStatus') : t('orders.applyOrderStatus')}
@@ -906,7 +950,7 @@ export default function DetailsPage() {
                     index={index}
                     t={t}
                     statusTone={statusColors}
-                    getStatusLabel={(s) => getOrderStatusLabel(s, t)}
+                    getStatusLabel={(s) => getOrderStatusLabel(s, t, undefined)}
                     onItemStatusChange={handleChangeItemStatus}
                     itemStatusPending={changeItemStatusMutation.isPending}
                   />

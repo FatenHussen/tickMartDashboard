@@ -5,8 +5,8 @@ import { formatDecimal, formatMoneyLine, normalizeFormattedMoneyText } from '@/u
 import {
   type OrderStatus,
   type OrderDetailItem,
-  normalizeOrderStatus,
-  ORDER_STATUS_OPTIONS,
+  parseOrderStatus,
+  ORDER_ITEM_STATUS_OPTIONS,
 } from '@/pages/dashboard/orders/types/order.types';
 
 import { toDisplayString } from 'src/utils/to-display-string';
@@ -92,8 +92,14 @@ export function OrderLineItemCard({
 }: OrderLineItemCardProps) {
   const imgSrc = resolveMediaUrl(item.product_image ?? undefined);
   const discount = item.discount ?? 0;
-  const st = normalizeOrderStatus(item.status);
+  const parsedItemStatus = parseOrderStatus(item.status);
+  const st = parsedItemStatus ?? 'pending';
   const lineNum = index + 1;
+  const itemStatusOptions: OrderStatus[] = parsedItemStatus
+    ? ORDER_ITEM_STATUS_OPTIONS.includes(parsedItemStatus)
+      ? ORDER_ITEM_STATUS_OPTIONS
+      : [parsedItemStatus, ...ORDER_ITEM_STATUS_OPTIONS.filter((s) => s !== parsedItemStatus)]
+    : ORDER_ITEM_STATUS_OPTIONS;
 
   return (
     <article className="group overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm ring-1 ring-black/[0.02] transition-all duration-300 hover:border-primary/25 hover:shadow-md dark:ring-white/[0.04]">
@@ -315,10 +321,10 @@ export function OrderLineItemCard({
             value={st}
             onChange={(e) => onItemStatusChange(item.id, e.target.value as OrderStatus)}
             className="h-11 w-full cursor-pointer rounded-xl border border-input bg-background px-3 text-sm font-medium shadow-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={itemStatusPending}
+            disabled={itemStatusPending || !parsedItemStatus}
             aria-label={t('orders.itemStatusSelect')}
           >
-            {ORDER_STATUS_OPTIONS.map((s) => (
+            {itemStatusOptions.map((s) => (
               <option key={s} value={s}>
                 {getStatusLabel(s)}
               </option>
