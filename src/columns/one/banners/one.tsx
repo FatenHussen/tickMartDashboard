@@ -3,16 +3,28 @@ import type { ColumnDef } from '@tanstack/react-table';
 
 import { z } from 'zod';
 import { Iconify } from '@/shared/components/iconify';
-import { formatTranslated } from '@/utils/format-translated';
+import { isActiveLanguageArabic } from 'src/lib/language-code';
 import { createToggleColumn } from '@/shared/ui/table-data/data-table-toggle-cell';
 import { DataTableRowActions } from '@/shared/ui/table-data/data-table-row-actions';
 import { DataTableColumnHeader } from '@/shared/ui/table-data/data-table-column-header';
 
 import { paths } from 'src/routes/paths';
 
+/** List text is a localized string or null. `null` is an empty cell, not the other language. */
+function bannerCellText(value: unknown): string {
+  if (value == null || Array.isArray(value)) return '-';
+  if (typeof value === 'string') return value.trim() || '-';
+  if (typeof value === 'object') {
+    const locale = value as { ar?: string | null; en?: string | null };
+    const text = isActiveLanguageArabic() ? locale.ar : locale.en;
+    return text?.trim() || '-';
+  }
+  return '-';
+}
+
 const BannerSchema = z.object({
   id: z.number(),
-  title: z.string(),
+  title: z.string().nullable(),
   description: z.string().nullable().optional(),
   image_url: z.string(),
   link: z.string().nullable().optional(),
@@ -24,7 +36,7 @@ const BannerSchema = z.object({
 
 export interface BannerFormValues {
   id: number;
-  title: string;
+  title: string | null;
   description?: string | null;
   image_url: string;
   link?: string | null;
@@ -60,7 +72,7 @@ export const bannerColumns = (
           {imageUrl ? (
             <img
               src={imageUrl}
-              alt={formatTranslated(row.original.title)}
+              alt={bannerCellText(row.original.title)}
               className="w-12 h-12 rounded-lg object-cover border border-border/60"
             />
           ) : (
@@ -83,7 +95,7 @@ export const bannerColumns = (
     header: ({ column }) => <DataTableColumnHeader column={column} title={t('columns.title')} />,
     cell: ({ row }) => (
       <div className="flex items-center gap-2.5 min-w-0">
-        <div className="font-semibold text-foreground truncate">{formatTranslated(row.original.title)}</div>
+        <div className="font-semibold text-foreground truncate">{bannerCellText(row.original.title)}</div>
       </div>
     ),
   },
@@ -92,7 +104,7 @@ export const bannerColumns = (
     accessorKey: 'description',
     header: ({ column }) => <DataTableColumnHeader column={column} title={t('columns.description')} />,
     cell: ({ row }) => {
-      const text = formatTranslated(row.original.description);
+      const text = bannerCellText(row.original.description);
       return (
         <div className="max-w-[200px]">
           <span className="text-sm text-muted-foreground truncate block" title={text}>

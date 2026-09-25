@@ -1,5 +1,3 @@
-import type { BannerItem } from '@/pages/dashboard/banners/types/banner.types';
-
 import { toast } from 'react-toastify';
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,7 +6,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Iconify } from '@/shared/components/iconify';
 import { compressImage } from '@/utils/compress-image';
-import { useParams, useNavigate, useLocation } from 'react-router';
+import { useParams, useNavigate } from 'react-router';
 import { stripBilingualDescriptionForForm } from '@/utils/optional-bilingual-api-placeholder';
 import {
   useCreateBanner,
@@ -40,16 +38,23 @@ function apiDateTimeToLocalInput(iso: string | null | undefined): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+/** `null` clears that language. Do not fall back to the other language or a previous value. */
+function localeInput(value: string | null | undefined): string {
+  if (value == null) return '';
+  return stripBilingualDescriptionForForm(value);
+}
+
 function bilingualFromSource(
-  value: string | { en?: string; ar?: string } | null | undefined
+  value: string | { en?: string | null; ar?: string | null } | null | undefined
 ): { en: string; ar: string } {
-  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+  if (value == null || Array.isArray(value)) return { en: '', ar: '' };
+  if (typeof value === 'object') {
     return {
-      en: stripBilingualDescriptionForForm(value.en ?? ''),
-      ar: stripBilingualDescriptionForForm(value.ar ?? ''),
+      en: localeInput(value.en),
+      ar: localeInput(value.ar),
     };
   }
-  const str = typeof value === 'string' ? stripBilingualDescriptionForForm(value) : '';
+  const str = stripBilingualDescriptionForForm(value);
   return { en: str, ar: str };
 }
 
@@ -69,8 +74,6 @@ export default function CreatePage() {
   const { t } = useTranslation('table');
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
-  const bannerFromState = location.state?.banner as BannerItem | undefined;
   const isEditMode = !!id;
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
@@ -98,7 +101,7 @@ export default function CreatePage() {
 
   // Load banner data from state or API when in edit mode
   useEffect(() => {
-    const source = isEditMode ? (detailsResponse?.data ?? bannerFromState) : null;
+    const source = isEditMode ? detailsResponse?.data : null;
     if (!source || isDirty) return;
     setPreviewUrl(source.image_url || null);
     reset({
@@ -109,11 +112,11 @@ export default function CreatePage() {
       link: source.link ?? '',
       expires_at: apiDateTimeToLocalInput(source.expires_at ?? null),
     });
-  }, [detailsResponse?.data, bannerFromState, isEditMode, isDirty, reset]);
+  }, [detailsResponse?.data, isEditMode, isDirty, reset]);
 
   // Update preview when image file changes
   useEffect(() => {
-    const currentImageUrl = detailsResponse?.data?.image_url || bannerFromState?.image_url;
+    const currentImageUrl = detailsResponse?.data?.image_url;
     if (imageFile instanceof File) {
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -125,7 +128,7 @@ export default function CreatePage() {
     } else if (isEditMode && !imageFile && currentImageUrl) {
       setPreviewUrl(currentImageUrl);
     }
-  }, [imageFile, isEditMode, detailsResponse?.data?.image_url, bannerFromState?.image_url]);
+  }, [imageFile, isEditMode, detailsResponse?.data?.image_url]);
 
   const isSubmitting = createBannerMutation.isPending || updateBannerMutation.isPending;
   const errorMessage =
@@ -191,7 +194,7 @@ export default function CreatePage() {
           /\.(mp4|webm|ogg|mov|m4v)(\?|$)/i.test(previewUrl)))
   );
 
-  if (isEditMode && isLoadingDetails && !bannerFromState) return <LoadingScreen />;
+  if (isEditMode && isLoadingDetails) return <LoadingScreen />;
 
   return (
     <>

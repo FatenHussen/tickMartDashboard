@@ -61,25 +61,10 @@ export default function Page() {
   };
 
   const handleEdit = (row: { original: BannerFormValues }) => {
-    navigate(`${paths.dashboard.banners}/update/${row.original.id}`, {
-      state: { banner: row.original },
-    });
+    navigate(`${paths.dashboard.banners}/update/${row.original.id}`);
   };
 
-  const rawItems = bannersResponse?.data?.items ?? [];
-  const bannerData: BannerFormValues[] = rawItems.map((item) => {
-    const desc = item.description;
-    const descriptionStr =
-      typeof desc === 'string'
-        ? desc
-        : desc && typeof desc === 'object' && 'en' in desc
-          ? ((desc as { en?: string }).en ?? '')
-          : '';
-    return {
-      ...item,
-      description: descriptionStr,
-    } as BannerFormValues;
-  });
+  const bannerData = (bannersResponse?.data?.items ?? []) as BannerFormValues[];
   const apiPagination = bannersResponse?.data?.pagination;
   const pagination = apiPagination
     ? {

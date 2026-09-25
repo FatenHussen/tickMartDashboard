@@ -1,13 +1,21 @@
 // ----------------------------------------------------------------------
 
+export interface BannerLocaleText {
+  ar?: string | null;
+  en?: string | null;
+}
+
+/** Details: `{ ar, en }` with `null` = cleared. List: localized string or `null`. */
+export type BannerTextField = string | BannerLocaleText | null;
+
 export interface BannerItem {
   id: number;
-  title: string | { en?: string; ar?: string };
-  description: string | { en?: string; ar?: string } | any[] | null;
-  button_text?: string | { en?: string; ar?: string } | null;
+  title: BannerTextField;
+  description: BannerTextField;
+  button_text?: BannerTextField;
   image_url: string;
   link?: string | null;
-  is_active: number;
+  is_active: number | boolean;
   order: number;
   created_at: string;
   /** null / missing = permanent banner */
