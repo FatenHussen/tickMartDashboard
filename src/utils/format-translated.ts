@@ -27,6 +27,21 @@ export function formatTranslated(value: TranslatedValue, fallback = '-'): string
   return fallback;
 }
 
+/**
+ * Banner card title. Active language first, then the other.
+ * `null`, `""`, or `{ ar: null, en: null }` → empty (image only).
+ */
+export function bannerCardName(title: unknown): string {
+  if (typeof title === 'string') return title.trim();
+  if (title && typeof title === 'object' && !Array.isArray(title)) {
+    const locale = title as { ar?: string | null; en?: string | null };
+    const primary = isActiveLanguageArabic() ? locale.ar : locale.en;
+    const secondary = isActiveLanguageArabic() ? locale.en : locale.ar;
+    return (primary || secondary || '').trim();
+  }
+  return '';
+}
+
 /** Pick the first non-empty label from title/name fields (string or `{ ar, en }`). */
 export function resolveItemDisplayLabel(
   ...values: (TranslatedValue | undefined)[]

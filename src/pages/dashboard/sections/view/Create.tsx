@@ -53,6 +53,8 @@ import {
   recommendedVariantForContentType,
 } from '@/pages/dashboard/sections/utils/content-type-config';
 
+import { bannerCardName } from 'src/utils/format-translated';
+
 import { CONFIG } from 'src/global-config';
 import { Button } from 'src/shared/ui/button';
 import { Box, Typography } from 'src/shared/ui';
@@ -212,7 +214,11 @@ export default function CreatePage() {
     if (isEditMode && sectionData?.data?.items) {
       for (const row of sectionData.data.items as any[]) {
         const rowId = row.item?.id ?? row.id;
-        const label = row.item?.name || row.item?.title || row.name || row.title || '';
+        const label =
+          bannerCardName(row.item?.title) ||
+          bannerCardName(row.item?.name) ||
+          bannerCardName(row.title) ||
+          bannerCardName(row.name);
         if (label) map.set(rowId, label);
       }
     }

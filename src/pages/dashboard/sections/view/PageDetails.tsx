@@ -44,6 +44,7 @@ import {
 } from '@/pages/dashboard/sections/hooks/usePageSections';
 
 import {
+  bannerCardName,
   formatTranslated,
   type TranslatedValue,
   resolveItemDisplayLabel,
@@ -86,11 +87,11 @@ function getItemImage(item: Record<string, unknown>): string | null {
       ? (item.item as Record<string, unknown>)
       : null;
   return resolveItemImageUrl(
-    item.image_url ??
-      item.image ??
-      item.icon ??
+    nested?.image ??
       nested?.image_url ??
-      nested?.image ??
+      item.image ??
+      item.image_url ??
+      item.icon ??
       nested?.icon
   );
 }
@@ -181,9 +182,17 @@ function sectionAccentBorder(type: PagePreviewSection['type']) {
   return type === 'api' ? 'border-l-blue-500' : 'border-l-violet-500';
 }
 
+function bannerItemName(item: Record<string, unknown>): string {
+  const nested =
+    item.item && typeof item.item === 'object' && !Array.isArray(item.item)
+      ? (item.item as Record<string, unknown>)
+      : null;
+  return bannerCardName(nested?.title ?? item.title);
+}
+
 function ItemThumb({ item, wide }: { item: Record<string, unknown>; wide?: boolean }) {
   const imageSrc = getItemImage(item);
-  const title = getItemTitle(item);
+  const title = wide ? bannerItemName(item) : getItemTitle(item);
 
   return (
     <div
@@ -223,7 +232,7 @@ function PreviewItemCard({
   wide?: boolean;
 }) {
   const imageSrc = getItemImage(item);
-  const title = getItemTitle(item);
+  const title = wide ? bannerItemName(item) : getItemTitle(item);
   const price =
     item.price_formatted != null
       ? String(item.price_formatted)

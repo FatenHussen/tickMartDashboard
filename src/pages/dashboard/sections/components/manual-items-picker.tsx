@@ -14,7 +14,7 @@ import { MANUAL_ITEM_PICKER_FILTERS } from '@/pages/dashboard/sections/utils/con
 
 import { paths } from 'src/routes/paths';
 
-import { type TranslatedValue, resolveItemDisplayLabel } from 'src/utils/format-translated';
+import { bannerCardName, type TranslatedValue, resolveItemDisplayLabel } from 'src/utils/format-translated';
 
 import { CONFIG } from 'src/global-config';
 import { Box, Input, Button, Typography } from 'src/shared/ui';
@@ -287,21 +287,26 @@ export function ManualItemsPicker({
               >
                 <Box className="flex flex-col gap-2 mt-2">
                   {orderedItems.map((entry, index) => {
-                    const resolvedLabel = itemLabelById.get(entry.item_id)?.trim() || '';
-                    const label = isWide
-                      ? resolvedLabel
-                      : resolvedLabel || t('form.itemNumberFallback', { id: entry.item_id });
                     const selectedRow = (allItems as Record<string, any>[]).find(
                       (row) => row.id === entry.item_id
                     );
+                    const resolvedLabel = isWide
+                      ? bannerCardName(selectedRow?.title) ||
+                        bannerCardName(itemLabelById.get(entry.item_id))
+                      : itemLabelById.get(entry.item_id)?.trim() || '';
+                    const label = isWide
+                      ? resolvedLabel
+                      : resolvedLabel || t('form.itemNumberFallback', { id: entry.item_id });
                     const selectedImage = selectedRow ? resolveItemImageUrl(selectedRow) : null;
                     return (
                       <SortableItem key={entry.item_id} id={entry.item_id}>
                         <Box className="flex min-w-0 flex-1 flex-col gap-2">
                           <Box className="flex min-w-0 flex-1 items-center gap-3">
-                            <Box className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-medium text-muted-foreground">
-                              {index + 1}
-                            </Box>
+                            {!isWide && (
+                              <Box className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-medium text-muted-foreground">
+                                {index + 1}
+                              </Box>
+                            )}
                             {selectedImage && (
                               <Box
                                 className={`shrink-0 overflow-hidden rounded-md border border-border/60 bg-muted/40 ${
@@ -438,10 +443,12 @@ export function ManualItemsPicker({
                 {allItems.map((item: any) => {
                   const isSelected = selectedIds.has(item.id);
                   const imageSrc = resolveItemImageUrl(item);
-                  const itemLabel = resolveItemDisplayLabel(
-                    item.name as TranslatedValue,
-                    item.title as TranslatedValue
-                  );
+                  const itemLabel = isWide
+                    ? bannerCardName(item.title)
+                    : resolveItemDisplayLabel(
+                        item.name as TranslatedValue,
+                        item.title as TranslatedValue
+                      );
                   return (
                     <Box
                       key={item.id}
