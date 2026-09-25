@@ -16,6 +16,7 @@ import {
   ALL_SECTION_CONTENT_TYPES,
 } from '@/pages/dashboard/sections/utils/content-type-config';
 
+import { CONFIG } from 'src/global-config';
 import { Box, Input, Button, Typography } from 'src/shared/ui';
 
 // ----------------------------------------------------------------------
@@ -26,21 +27,13 @@ function sectionName(item: SliderLibraryItem, imageOnlyFallback: boolean): strin
   return imageOnlyFallback ? '' : `#${item.id}`;
 }
 
-function sectionPreviewImage(item: SliderLibraryItem): string | null {
-  const row = item as SliderLibraryItem & {
-    image?: unknown;
-    image_url?: unknown;
-    items?: Array<{ image?: unknown; image_url?: unknown; item?: { image?: unknown; image_url?: unknown } }>;
-  };
-  const candidates = [row.image_url, row.image];
-  const first = row.items?.[0];
-  if (first) {
-    candidates.push(first.image, first.image_url, first.item?.image, first.item?.image_url);
-  }
-  for (const candidate of candidates) {
-    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
-  }
-  return null;
+function sectionPreviewImage(imageUrl: string | null | undefined): string | null {
+  if (typeof imageUrl !== 'string') return null;
+  const src = imageUrl.trim();
+  if (!src) return null;
+  if (src.startsWith('http://') || src.startsWith('https://')) return src;
+  const base = CONFIG.serverUrl?.replace(/\/$/, '') ?? '';
+  return base ? `${base}/${src.replace(/^\//, '')}` : src;
 }
 
 /**
@@ -231,7 +224,7 @@ export function SliderLibraryPicker({
                     const isSelected = selectedId === section.id;
                     const bannerCard = isBannerContentType(contentType) || contentType === 'gif';
                     const name = sectionName(section, bannerCard);
-                    const previewImage = bannerCard ? sectionPreviewImage(section) : null;
+                    const previewImage = bannerCard ? sectionPreviewImage(section.image_url) : null;
                     return (
                       <button
                         key={section.id}

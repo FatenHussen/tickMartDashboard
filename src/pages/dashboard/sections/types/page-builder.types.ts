@@ -82,6 +82,8 @@ export interface SliderLibraryItem {
   variant?: string;
   background_color?: string | null;
   background_card_color?: string | null;
+  /** First banner image when `content_type` is `banner`. `null` = no image. */
+  image_url?: string | null;
   /** How many pages already use this section. */
   pages_count?: number;
 }
