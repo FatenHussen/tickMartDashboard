@@ -4,13 +4,14 @@ import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useRef, useState, useEffect } from 'react';
 import { Iconify } from '@/shared/components/iconify';
-import { formatTranslated } from '@/utils/format-translated';
+import { bannerCardName } from '@/utils/format-translated';
 import { ChoiceCard } from '@/pages/dashboard/sections/components/section-form-ui';
 import { useInfinitePageSliders } from '@/pages/dashboard/sections/hooks/usePageBuilder';
 import { normalizeLayoutAndCardShape } from '@/pages/dashboard/sections/utils/section-layout';
 import {
   contentTypeLabel,
   CONTENT_TYPE_ICONS,
+  isBannerContentType,
   isQuickOrderContentType,
   ALL_SECTION_CONTENT_TYPES,
 } from '@/pages/dashboard/sections/utils/content-type-config';
@@ -19,9 +20,27 @@ import { Box, Input, Button, Typography } from 'src/shared/ui';
 
 // ----------------------------------------------------------------------
 
-function sectionName(item: SliderLibraryItem): string {
-  if (typeof item.name === 'string') return item.name;
-  return formatTranslated(item.name as { en?: string; ar?: string }) || `#${item.id}`;
+function sectionName(item: SliderLibraryItem, imageOnlyFallback: boolean): string {
+  const name = bannerCardName(item.name);
+  if (name) return name;
+  return imageOnlyFallback ? '' : `#${item.id}`;
+}
+
+function sectionPreviewImage(item: SliderLibraryItem): string | null {
+  const row = item as SliderLibraryItem & {
+    image?: unknown;
+    image_url?: unknown;
+    items?: Array<{ image?: unknown; image_url?: unknown; item?: { image?: unknown; image_url?: unknown } }>;
+  };
+  const candidates = [row.image_url, row.image];
+  const first = row.items?.[0];
+  if (first) {
+    candidates.push(first.image, first.image_url, first.item?.image, first.item?.image_url);
+  }
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+  }
+  return null;
 }
 
 /**
@@ -210,6 +229,9 @@ export function SliderLibraryPicker({
                 <Box className="divide-y divide-border/60">
                   {allSliders.map((section) => {
                     const isSelected = selectedId === section.id;
+                    const bannerCard = isBannerContentType(contentType) || contentType === 'gif';
+                    const name = sectionName(section, bannerCard);
+                    const previewImage = bannerCard ? sectionPreviewImage(section) : null;
                     return (
                       <button
                         key={section.id}
@@ -228,27 +250,35 @@ export function SliderLibraryPicker({
                         >
                           {isSelected && <Iconify icon="solar:check-read-bold" width={12} />}
                         </span>
-                        <Box className="min-w-0 flex-1">
-                          <Typography
-                            variant="body1"
-                            className="truncate font-semibold text-foreground"
-                          >
-                            {sectionName(section)}
-                          </Typography>
-                          {(() => {
-                            const { layout, variant } = normalizeLayoutAndCardShape({
-                              layout: section.layout,
-                              variant: section.variant,
-                            });
-                            return (
-                              <Typography variant="caption" className="mt-0.5 text-muted-foreground">
-                                {t(`form.sectionEasyLayout_${layout}`)}
-                                {' · '}
-                                {t(`form.sectionEasyCardShape_${variant}`)}
-                              </Typography>
-                            );
-                          })()}
-                        </Box>
+                        {previewImage && (
+                          <Box className="aspect-[16/6] w-28 shrink-0 overflow-hidden rounded-md border border-border/60 bg-muted/40 sm:w-36">
+                            <img src={previewImage} alt="" className="h-full w-full object-cover" />
+                          </Box>
+                        )}
+                        {(!bannerCard || name) && (
+                          <Box className="min-w-0 flex-1">
+                            <Typography
+                              variant="body1"
+                              className="truncate font-semibold text-foreground"
+                            >
+                              {name}
+                            </Typography>
+                            {!bannerCard &&
+                              (() => {
+                                const { layout, variant } = normalizeLayoutAndCardShape({
+                                  layout: section.layout,
+                                  variant: section.variant,
+                                });
+                                return (
+                                  <Typography variant="caption" className="mt-0.5 text-muted-foreground">
+                                    {t(`form.sectionEasyLayout_${layout}`)}
+                                    {' · '}
+                                    {t(`form.sectionEasyCardShape_${variant}`)}
+                                  </Typography>
+                                );
+                              })()}
+                          </Box>
+                        )}
                         {isSelected && (
                           <Iconify
                             icon="solar:check-circle-bold"
