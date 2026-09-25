@@ -92,24 +92,24 @@ export default function CreatePage() {
     defaultValues,
   });
 
-  const { handleSubmit, reset, control, watch, setError, clearErrors } = methods;
+  const { handleSubmit, reset, control, watch, setError, clearErrors, formState } = methods;
+  const { isDirty } = formState;
   const imageFile = watch('image');
 
   // Load banner data from state or API when in edit mode
   useEffect(() => {
     const source = isEditMode ? (detailsResponse?.data ?? bannerFromState) : null;
-    if (source) {
-      setPreviewUrl(source.image_url || null);
-      reset({
-        title: bilingualFromSource(source.title),
-        description: bilingualFromSource(source.description as any),
-        button_text: bilingualFromSource(source.button_text),
-        image: null,
-        link: source.link ?? '',
-        expires_at: apiDateTimeToLocalInput(source.expires_at ?? null),
-      });
-    }
-  }, [detailsResponse?.data, bannerFromState, isEditMode, reset]);
+    if (!source || isDirty) return;
+    setPreviewUrl(source.image_url || null);
+    reset({
+      title: bilingualFromSource(source.title),
+      description: bilingualFromSource(source.description as any),
+      button_text: bilingualFromSource(source.button_text),
+      image: null,
+      link: source.link ?? '',
+      expires_at: apiDateTimeToLocalInput(source.expires_at ?? null),
+    });
+  }, [detailsResponse?.data, bannerFromState, isEditMode, isDirty, reset]);
 
   // Update preview when image file changes
   useEffect(() => {
