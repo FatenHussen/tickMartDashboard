@@ -5,8 +5,8 @@ import { isApiValidationError } from '@/api/errors';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Iconify } from '@/shared/components/iconify';
-import { compressImage } from '@/utils/compress-image';
 import { useParams, useNavigate } from 'react-router';
+import { compressImage } from '@/utils/compress-image';
 import { stripBilingualDescriptionForForm } from '@/utils/optional-bilingual-api-placeholder';
 import {
   useCreateBanner,

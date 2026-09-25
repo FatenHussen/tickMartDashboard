@@ -3,12 +3,13 @@ import type { ColumnDef } from '@tanstack/react-table';
 
 import { z } from 'zod';
 import { Iconify } from '@/shared/components/iconify';
-import { isActiveLanguageArabic } from 'src/lib/language-code';
 import { createToggleColumn } from '@/shared/ui/table-data/data-table-toggle-cell';
 import { DataTableRowActions } from '@/shared/ui/table-data/data-table-row-actions';
 import { DataTableColumnHeader } from '@/shared/ui/table-data/data-table-column-header';
 
 import { paths } from 'src/routes/paths';
+
+import { isActiveLanguageArabic } from 'src/lib/language-code';
 
 /** List text is a localized string or null. `null` is an empty cell, not the other language. */
 function bannerCellText(value: unknown): string {
