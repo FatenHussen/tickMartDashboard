@@ -202,9 +202,11 @@ function ItemThumb({ item, wide }: { item: Record<string, unknown>; wide?: boole
           <Iconify icon="solar:gallery-minimalistic-bold" className="text-muted-foreground/30" width={18} />
         )}
       </div>
-      <span className="line-clamp-1 px-1.5 pb-1.5 text-center text-[10px] text-muted-foreground">
-        {title}
-      </span>
+      {title && title !== '—' && (
+        <span className="line-clamp-1 px-1.5 pb-1.5 text-center text-[10px] text-muted-foreground">
+          {title}
+        </span>
+      )}
     </div>
   );
 }
@@ -246,13 +248,17 @@ function PreviewItemCard({
             <img src={imageSrc} alt={title} className="h-full w-full object-cover" />
           </div>
         )}
-        <p className="truncate text-sm font-medium text-foreground">{title}</p>
-        <p className="text-xs text-muted-foreground">
-          {t('form.pagePreviewItemIndex', { index: index + 1 })}
-          {item.id != null ? ` · #${String(item.id)}` : ''}
-          {price ? ` · ${price}` : ''}
-        </p>
-        {typeof item.link === 'string' && item.link && (
+        {(!wide || (title && title !== '—')) && (
+          <p className="truncate text-sm font-medium text-foreground">{title}</p>
+        )}
+        {!wide && (
+          <p className="text-xs text-muted-foreground">
+            {t('form.pagePreviewItemIndex', { index: index + 1 })}
+            {item.id != null ? ` · #${String(item.id)}` : ''}
+            {price ? ` · ${price}` : ''}
+          </p>
+        )}
+        {!wide && typeof item.link === 'string' && item.link && (
           <a
             href={item.link}
             target="_blank"

@@ -287,9 +287,10 @@ export function ManualItemsPicker({
               >
                 <Box className="flex flex-col gap-2 mt-2">
                   {orderedItems.map((entry, index) => {
-                    const label =
-                      itemLabelById.get(entry.item_id)?.trim() ||
-                      t('form.itemNumberFallback', { id: entry.item_id });
+                    const resolvedLabel = itemLabelById.get(entry.item_id)?.trim() || '';
+                    const label = isWide
+                      ? resolvedLabel
+                      : resolvedLabel || t('form.itemNumberFallback', { id: entry.item_id });
                     const selectedRow = (allItems as Record<string, any>[]).find(
                       (row) => row.id === entry.item_id
                     );
@@ -315,14 +316,18 @@ export function ManualItemsPicker({
                                 />
                               </Box>
                             )}
-                            <Box className="min-w-0 flex-1">
-                              <Typography variant="body2" className="font-medium truncate">
-                                {label}
-                              </Typography>
-                              <Typography variant="caption" className="text-muted-foreground">
-                                {t('form.itemIdBadgeShort', { id: entry.item_id })}
-                              </Typography>
-                            </Box>
+                            {(!isWide || label) && (
+                              <Box className="min-w-0 flex-1">
+                                <Typography variant="body2" className="font-medium truncate">
+                                  {label}
+                                </Typography>
+                                {!isWide && (
+                                  <Typography variant="caption" className="text-muted-foreground">
+                                    {t('form.itemIdBadgeShort', { id: entry.item_id })}
+                                  </Typography>
+                                )}
+                              </Box>
+                            )}
                           </Box>
                           {!hideItemLinks && (
                             <Box
@@ -433,6 +438,10 @@ export function ManualItemsPicker({
                 {allItems.map((item: any) => {
                   const isSelected = selectedIds.has(item.id);
                   const imageSrc = resolveItemImageUrl(item);
+                  const itemLabel = resolveItemDisplayLabel(
+                    item.name as TranslatedValue,
+                    item.title as TranslatedValue
+                  );
                   return (
                     <Box
                       key={item.id}
@@ -477,27 +486,28 @@ export function ManualItemsPicker({
                           />
                         </Box>
                       )}
-                      <Box className="flex-1 min-w-0">
-                        <Box className="flex items-center gap-2 mb-1">
-                          <Typography variant="body1" className="font-semibold text-foreground">
-                            {resolveItemDisplayLabel(
-                              item.name as TranslatedValue,
-                              item.title as TranslatedValue
-                            ) || t('form.itemNumberFallback', { id: item.id })}
-                          </Typography>
-                          <Box className="px-2 py-0.5 rounded bg-muted text-xs text-muted-foreground">
-                            {t('form.itemIdBadgeShort', { id: item.id })}
+                      {(!isWide || itemLabel) && (
+                        <Box className="flex-1 min-w-0">
+                          <Box className="flex items-center gap-2 mb-1">
+                            <Typography variant="body1" className="font-semibold text-foreground">
+                              {itemLabel || t('form.itemNumberFallback', { id: item.id })}
+                            </Typography>
+                            {!isWide && (
+                              <Box className="px-2 py-0.5 rounded bg-muted text-xs text-muted-foreground">
+                                {t('form.itemIdBadgeShort', { id: item.id })}
+                              </Box>
+                            )}
                           </Box>
+                          {!isWide && item.desc && (
+                            <Typography
+                              variant="body2"
+                              className="text-muted-foreground text-sm line-clamp-1"
+                            >
+                              {item.desc}
+                            </Typography>
+                          )}
                         </Box>
-                        {item.desc && (
-                          <Typography
-                            variant="body2"
-                            className="text-muted-foreground text-sm line-clamp-1"
-                          >
-                            {item.desc}
-                          </Typography>
-                        )}
-                      </Box>
+                      )}
                       {isSelected && (
                         <Iconify
                           icon="solar:check-circle-bold"
