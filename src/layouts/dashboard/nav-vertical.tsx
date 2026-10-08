@@ -24,7 +24,6 @@ export type NavVerticalProps = React.ComponentProps<'div'> &
     };
     className?: string;
     style?: React.CSSProperties;
-    checkPermission?: (permission?: string) => boolean;
   };
 
 export function NavVertical({
@@ -36,6 +35,7 @@ export function NavVertical({
   onToggleNav,
   checkPermissions,
   checkPermission,
+  checkPermissionAny,
   layoutQuery = 'md',
   style,
   ...other
@@ -60,6 +60,7 @@ export function NavVertical({
           cssVars={cssVars}
           checkPermissions={checkPermissions}
           checkPermission={checkPermission}
+          checkPermissionAny={checkPermissionAny}
           className="px-2.5 pb-4 flex-auto"
         />
       </Scrollbar>
@@ -84,6 +85,7 @@ export function NavVertical({
         cssVars={cssVars}
         checkPermissions={checkPermissions}
         checkPermission={checkPermission}
+        checkPermissionAny={checkPermissionAny}
         enabledRootRedirect
         className="flex w-full min-w-0 flex-col items-stretch pb-6 pt-2 px-2 flex-auto overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden relative z-10"
       />

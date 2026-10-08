@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { paths } from 'src/routes/paths';
 
 import { Box } from 'src/shared/ui';
+import { usePermissions } from 'src/auth/hooks/use-permissions';
 import { Iconify } from 'src/shared/components/iconify';
 
 // ----------------------------------------------------------------------
@@ -15,13 +16,37 @@ const activeClass = 'bg-primary/15 text-foreground shadow-sm ring-1 ring-primary
 
 export function DashboardQuickNav() {
   const { t } = useTranslation('nav');
+  const { can } = usePermissions();
 
   const items = [
-    { to: paths.dashboard.products, label: t('products'), icon: 'solar:box-minimalistic-bold-duotone' },
-    { to: paths.dashboard.orders, label: t('orders'), icon: 'solar:cart-large-2-bold-duotone' },
-    { to: paths.dashboard.settings, label: t('settings'), icon: 'solar:settings-bold-duotone' },
-    { to: paths.dashboard.driver, label: t('driver'), icon: 'solar:delivery-bold-duotone' },
+    {
+      to: paths.dashboard.products,
+      label: t('products'),
+      icon: 'solar:box-minimalistic-bold-duotone',
+      permission: 'product.view',
+    },
+    {
+      to: paths.dashboard.orders,
+      label: t('orders'),
+      icon: 'solar:cart-large-2-bold-duotone',
+      permission: 'order.view',
+    },
+    {
+      to: paths.dashboard.settings,
+      label: t('settings'),
+      icon: 'solar:settings-bold-duotone',
+      permission: 'setting.view',
+    },
+    {
+      to: paths.dashboard.driver,
+      label: t('driver'),
+      icon: 'solar:delivery-bold-duotone',
+      permission: 'driver.view',
+    },
   ] as const;
+
+  const visibleItems = items.filter((item) => can(item.permission));
+  if (!visibleItems.length) return null;
 
   return (
     <Box className="sticky top-[var(--layout-header-mobile-height)] z-20 shrink-0 border-b border-border/50 bg-card/95 px-3 py-2 shadow-sm backdrop-blur-md md:top-[var(--layout-header-desktop-height)] sm:px-4 md:px-6">
@@ -29,7 +54,7 @@ export function DashboardQuickNav() {
         className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-1 sm:gap-2"
         aria-label={t('quickNavAria')}
       >
-        {items.map(({ to, label, icon }) => (
+        {visibleItems.map(({ to, label, icon }) => (
           <NavLink
             key={to}
             to={to}

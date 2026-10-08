@@ -269,11 +269,7 @@ export function getNavData(t: TFunction<'nav'>): NavSectionProps['data'] {
           title: t('customOrderRequests'),
           path: paths.dashboard.customOrderRequests,
           icon: ICONS.file,
-          requiredPermissionAny: [
-            'customorderrequest.view',
-            'custom_order_request.view',
-            'order.view',
-          ],
+          requiredPermissionAny: ['customorderrequest.view', 'custom_order_request.view'],
         },
         { title: t('serviceOrders'), path: paths.dashboard.serviceOrders, icon: ICONS.invoice, requiredPermission: 'serviceorder.view' },
       ],
@@ -289,8 +285,18 @@ export function getNavData(t: TFunction<'nav'>): NavSectionProps['data'] {
         </span>
       ) as any,
       items: [
-        { title: t('vendorAccountingNav'), path: paths.dashboard.vendorAccounting.root, icon: ICONS.banking },
-        { title: t('vendorWithdrawRequests'), path: paths.dashboard.vendorWithdrawRequests, icon: ICONS.invoice },
+        {
+          title: t('vendorAccountingNav'),
+          path: paths.dashboard.vendorAccounting.root,
+          icon: ICONS.banking,
+          requiredPermission: 'vendoraccounting.view',
+        },
+        {
+          title: t('vendorWithdrawRequests'),
+          path: paths.dashboard.vendorWithdrawRequests,
+          icon: ICONS.invoice,
+          requiredPermission: 'vendorwithdrawrequest.view',
+        },
       ],
     },
     /**

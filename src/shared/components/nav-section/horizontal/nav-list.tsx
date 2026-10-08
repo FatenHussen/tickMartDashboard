@@ -8,6 +8,7 @@ import { usePathname } from 'src/routes/hooks';
 
 import { NavItem } from './nav-item';
 import { navSectionClasses } from '../styles';
+import { isNavItemPermissionAllowed } from '../utils';
 import { NavUl, NavLi, NavDropdown, NavDropdownPaper } from '../components';
 
 // ----------------------------------------------------------------------
@@ -148,10 +149,7 @@ export function NavList({
     return null;
   }
 
-  // Hidden item by permission
-  if (data.requiredPermissionAny && checkPermissionAny) {
-    if (!checkPermissionAny(data.requiredPermissionAny)) return null;
-  } else if (data.requiredPermission && checkPermission && !checkPermission(data.requiredPermission)) {
+  if (!isNavItemPermissionAllowed(data, checkPermission, checkPermissionAny)) {
     return null;
   }
 

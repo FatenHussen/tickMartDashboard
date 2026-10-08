@@ -11,6 +11,7 @@ import { Box, Alert } from 'src/shared/ui';
 import { getFcmToken } from 'src/lib/firebase';
 import { Logo } from 'src/shared/components/logo';
 import { apiRoutes, axiosInstance } from 'src/api';
+import { can, canAny } from 'src/auth/permissions';
 import { useMockedUser } from 'src/pages/auth/hooks';
 import { useSettingsContext } from 'src/shared/components/settings';
 import { useAuthContext } from 'src/pages/auth/hooks/use-auth-context';
@@ -92,22 +93,15 @@ export function DashboardLayout({
   const canDisplayItemByRole = (allowedRoles: NavItemProps['allowedRoles']): boolean =>
     !allowedRoles?.includes(user?.role);
 
-  // Permission-based check
+  // Permission-based check (Spatie permission strings from login/profile)
   const canDisplayItemByPermission = (requiredPermission?: string): boolean => {
-    if (!requiredPermission) {
-      return true; // No permission required, show item
-    }
-    if (!permissions || !Array.isArray(permissions)) {
-      return false; // No permissions available, hide item
-    }
-    return permissions.includes(requiredPermission);
+    if (!requiredPermission) return true;
+    return can(permissions, requiredPermission);
   };
 
-  // Permission-based check (any of the list)
   const canDisplayItemByPermissionAny = (requiredPermissions: string[]): boolean => {
     if (!requiredPermissions?.length) return true;
-    if (!permissions || !Array.isArray(permissions)) return false;
-    return requiredPermissions.some((p) => permissions.includes(p));
+    return canAny(permissions, requiredPermissions);
   };
 
   const renderHeader = () => {

@@ -8,8 +8,10 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 
 import { Box, Input, Modal } from 'src/shared/ui';
 import { Label } from 'src/shared/components/label';
+import { usePermissions } from 'src/auth/hooks/use-permissions';
 import { Iconify } from 'src/shared/components/iconify';
 import { Scrollbar } from 'src/shared/components/scrollbar';
+import { canShowNavItem } from 'src/shared/components/nav-section';
 import { SearchNotFound } from 'src/shared/components/search-not-found';
 
 import { ResultItem } from './result-item';
@@ -27,6 +29,7 @@ const breakpoint = 'sm';
 export function Searchbar({ data: navItems = [], className, ...other }: SearchbarProps) {
   const { t: tTable } = useTranslation('table');
   const { t: tCommon } = useTranslation('common');
+  const { can, canAny } = usePermissions();
   const [isSmUp, setIsSmUp] = useState(false);
 
   useEffect(() => {
@@ -69,7 +72,23 @@ export function Searchbar({ data: navItems = [], className, ...other }: Searchba
     setSearchQuery(event.target.value);
   }, []);
 
-  const formattedNavItems = flattenNavSections(navItems);
+  const permittedNavItems = useMemo(
+    () =>
+      navItems
+        .map((group) => ({
+          ...group,
+          items: group.items.filter((item) =>
+            canShowNavItem(item, undefined, can, canAny)
+          ),
+        }))
+        .filter((group) => group.items.length > 0),
+    [navItems, can, canAny]
+  );
+
+  const formattedNavItems = useMemo(
+    () => flattenNavSections(permittedNavItems),
+    [permittedNavItems]
+  );
 
   const dataFiltered = useMemo(
     () =>
