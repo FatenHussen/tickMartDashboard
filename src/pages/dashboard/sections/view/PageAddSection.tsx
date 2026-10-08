@@ -93,6 +93,8 @@ export default function PageAddSection() {
 
   const [showWhenValues, setShowWhenValues] = useState<Record<string, any>>({});
   const [selectedSection, setSelectedSection] = useState<SliderLibraryItem | null>(null);
+  /** Multiple banners selected for one new banner section (slider). */
+  const [selectedBanners, setSelectedBanners] = useState<SliderLibraryItem[]>([]);
   const [filterContentType, setFilterContentType] = useState('');
   const [showColors, setShowColors] = useState(false);
 
@@ -129,7 +131,11 @@ export default function PageAddSection() {
       : false;
   }, [pageDetailsData]);
 
-  const isBannerSection = isBannerContentType(selectedSection?.content_type);
+  const isBannerContent = isBannerContentType(filterContentType);
+  const isBannerSection = isBannerContent || selectedBanners.length > 0;
+  const hasLibrarySelection = isBannerContent
+    ? selectedBanners.length > 0
+    : Boolean(selectedSection);
 
   const methods = useForm<UnifiedSectionFormValues>({
     resolver: zodResolver(UnifiedSectionSchema),
@@ -152,6 +158,12 @@ export default function PageAddSection() {
   const watchedCardBg = watch('background_card_color');
 
   useEffect(() => {
+    if (isBannerContent) {
+      // New banner sections default to a swipeable slider.
+      setValue('layout', 'slider', { shouldValidate: true });
+      setValue('variant', 'horizontal', { shouldValidate: true });
+      return;
+    }
     if (!selectedSection) return;
     if (selectedSection.content_type) {
       setFilterContentType(selectedSection.content_type);
@@ -167,16 +179,41 @@ export default function PageAddSection() {
     });
     setValue('layout', layout, { shouldValidate: true });
     setValue('variant', variant, { shouldValidate: true });
-  }, [selectedSection, setValue]);
+  }, [selectedSection, isBannerContent, setValue]);
 
   const handleShowWhenChange = (filterKey: string, value: any) => {
     setShowWhenValues((prev) => ({ ...prev, [filterKey]: value }));
   };
 
+  const handleContentTypeChange = (type: string) => {
+    setFilterContentType(type);
+    setSelectedSection(null);
+    setSelectedBanners([]);
+  };
+
+  const handleToggleBanner = (item: SliderLibraryItem) => {
+    setSelectedBanners((prev) => {
+      const exists = prev.some((b) => b.id === item.id);
+      if (exists) return prev.filter((b) => b.id !== item.id);
+      return [...prev, item];
+    });
+    setSelectedSection(null);
+  };
+
+  const handleSelectSection = (item: SliderLibraryItem | null) => {
+    setSelectedSection(item);
+    setSelectedBanners([]);
+  };
+
   const onSubmit = async (data: UnifiedSectionFormValues) => {
     if (!pageId) return;
 
-    if (!selectedSection) {
+    if (isBannerContent) {
+      if (selectedBanners.length === 0) {
+        toast.error(t('form.pageBuilderLibraryRequired'));
+        return;
+      }
+    } else if (!selectedSection) {
       toast.error(t('form.pageBuilderLibraryRequired'));
       return;
     }
@@ -201,17 +238,20 @@ export default function PageAddSection() {
         : {}),
     };
 
-    const payload: UnifiedSectionCreatePayload = selectedSection.banner_id
+    const payload: UnifiedSectionCreatePayload = isBannerContent
       ? {
           ...sharedPlacement,
           type: 'manual',
           content_type: 'banner',
-          name: bannerSectionName(selectedSection.name),
-          item_ids: [{ item_id: selectedSection.banner_id, order: 0 }],
+          name: bannerSectionName(selectedBanners[0]?.name),
+          item_ids: selectedBanners.map((banner, index) => ({
+            item_id: banner.banner_id ?? banner.id,
+            order: index,
+          })),
         }
       : {
           ...sharedPlacement,
-          section_id: selectedSection.id,
+          section_id: selectedSection!.id,
         };
 
     try {
@@ -229,9 +269,16 @@ export default function PageAddSection() {
 
   const pageLabel = page ? cmsPageSelectLabel(page) : (pageId ?? '');
   const hasColors = Boolean(watchedBg || watchedCardBg);
-  const showLookSteps = Boolean(filterContentType || selectedSection);
+  const showLookSteps = Boolean(filterContentType || selectedSection || selectedBanners.length);
   const positionStep = showLookSteps ? 4 : 2;
   const visibilityStep = hasVisibilityStep ? positionStep + 1 : positionStep;
+  const selectionSummary = isBannerContent
+    ? selectedBanners.length > 0
+      ? t('form.itemsSelectedCount', { count: selectedBanners.length })
+      : null
+    : selectedSection
+      ? sectionDisplayName(selectedSection)
+      : null;
 
   return (
     <>
@@ -263,12 +310,14 @@ export default function PageAddSection() {
           <SliderLibraryPicker
             pageId={pageId ?? ''}
             selectedId={selectedSection?.id ?? null}
+            selectedIds={isBannerContent ? selectedBanners.map((b) => b.id) : undefined}
             selectedContentType={selectedSection?.content_type ?? filterContentType}
-            onSelect={setSelectedSection}
-            onContentTypeChange={setFilterContentType}
+            onSelect={handleSelectSection}
+            onToggleSelect={handleToggleBanner}
+            onContentTypeChange={handleContentTypeChange}
           />
 
-          {selectedSection && (
+          {selectionSummary && (
             <Box className="flex items-center gap-3 rounded-2xl border border-primary/25 bg-primary/[0.05] px-4 py-3">
               <Iconify icon="solar:check-circle-bold" className="shrink-0 text-primary" width={22} />
               <Box className="min-w-0 flex-1">
@@ -276,12 +325,15 @@ export default function PageAddSection() {
                   {t('form.pageBuilderSelectedSection')}
                 </Typography>
                 <Typography variant="subtitle2" className="font-bold text-foreground truncate">
-                  {sectionDisplayName(selectedSection)}
+                  {selectionSummary}
                 </Typography>
               </Box>
               <button
                 type="button"
-                onClick={() => setSelectedSection(null)}
+                onClick={() => {
+                  setSelectedSection(null);
+                  setSelectedBanners([]);
+                }}
                 className="shrink-0 text-sm font-medium text-primary hover:underline"
               >
                 {t('form.pageBuilderChangeSection')}
@@ -361,7 +413,7 @@ export default function PageAddSection() {
           </>
         )}
 
-        {selectedSection && (
+        {hasLibrarySelection && (
           <>
         <FormStep n={positionStep} title={t('form.pageBuilderAddStep2Title')} hint={t('form.pageBuilderAddStep2Hint')}>
           <Box className="grid grid-cols-1 gap-3 sm:grid-cols-2">

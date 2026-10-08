@@ -50,18 +50,27 @@ function sectionPreviewImage(imageUrl: string | null | undefined): string | null
 
 /**
  * Pick content type first, then browse matching sections from the library.
+ * Banner content type uses multi-select (checkbox) so one section can hold several slides.
+ * Other types stay single-select (link an existing section).
  */
 export function SliderLibraryPicker({
   pageId,
   selectedId,
+  selectedIds,
   selectedContentType,
   onSelect,
+  onToggleSelect,
   onContentTypeChange,
 }: {
   pageId: number | string;
+  /** Single selection (non-banner content types). */
   selectedId: number | null;
+  /** Multi selection when content type is banner. */
+  selectedIds?: number[];
   selectedContentType?: string | null;
   onSelect: (item: SliderLibraryItem | null) => void;
+  /** Toggle a banner in/out of the multi selection. */
+  onToggleSelect?: (item: SliderLibraryItem) => void;
   onContentTypeChange?: (contentType: string) => void;
 }) {
   const { t } = useTranslation('table');
@@ -72,6 +81,8 @@ export function SliderLibraryPicker({
   const sentinelRef = useRef<HTMLDivElement>(null);
   const listScrollRef = useRef<HTMLElement | null>(null);
   const isBannerList = isBannerContentType(contentType);
+  const multiSelect = isBannerList;
+  const selectedIdSet = new Set(selectedIds ?? (selectedId != null ? [selectedId] : []));
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(searchTerm.trim()), 300);
@@ -183,6 +194,19 @@ export function SliderLibraryPicker({
             })}
           </Typography>
 
+          {multiSelect && (
+            <Box className="flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.06] px-4 py-3">
+              <Iconify
+                icon="solar:info-circle-bold"
+                className="mt-0.5 shrink-0 text-amber-600"
+                width={18}
+              />
+              <Typography variant="body2" className="min-w-0 flex-1 text-muted-foreground">
+                {t('form.pageBuilderBannerPickHelper')}
+              </Typography>
+            </Box>
+          )}
+
           <Box className="relative">
             <Iconify
               icon="solar:magnifer-linear"
@@ -254,7 +278,7 @@ export function SliderLibraryPicker({
               ) : (
                 <Box className="divide-y divide-border/60">
                   {rows.map((section) => {
-                    const isSelected = selectedId === section.id;
+                    const isSelected = selectedIdSet.has(section.id);
                     const bannerCard = isBannerContentType(contentType) || contentType === 'gif';
                     const name = sectionName(section, bannerCard);
                     const previewImage = bannerCard ? sectionPreviewImage(section.image_url) : null;
@@ -262,20 +286,37 @@ export function SliderLibraryPicker({
                       <button
                         key={section.id}
                         type="button"
-                        onClick={() => onSelect(section)}
+                        onClick={() => {
+                          if (multiSelect) {
+                            onToggleSelect?.(section);
+                            return;
+                          }
+                          onSelect(section);
+                        }}
                         className={`flex w-full items-center gap-4 p-4 text-start transition-colors hover:bg-muted/40 ${
                           isSelected ? 'bg-primary/[0.06] ring-2 ring-inset ring-primary/30' : ''
                         }`}
                       >
-                        <span
-                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
-                            isSelected
-                              ? 'border-primary bg-primary text-primary-foreground'
-                              : 'border-border/80 bg-background'
-                          }`}
-                        >
-                          {isSelected && <Iconify icon="solar:check-read-bold" width={12} />}
-                        </span>
+                        {multiSelect ? (
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            readOnly
+                            tabIndex={-1}
+                            aria-hidden
+                            className="pointer-events-none h-5 w-5 shrink-0 rounded border-border text-primary"
+                          />
+                        ) : (
+                          <span
+                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+                              isSelected
+                                ? 'border-primary bg-primary text-primary-foreground'
+                                : 'border-border/80 bg-background'
+                            }`}
+                          >
+                            {isSelected && <Iconify icon="solar:check-read-bold" width={12} />}
+                          </span>
+                        )}
                         {previewImage && (
                           <Box className="aspect-[16/6] w-28 shrink-0 overflow-hidden rounded-md border border-border/60 bg-muted/40 sm:w-36">
                             <img src={previewImage} alt="" className="h-full w-full object-cover" />
