@@ -4,8 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { paths } from 'src/routes/paths';
 
 import { Box } from 'src/shared/ui';
-import { usePermissions } from 'src/auth/hooks/use-permissions';
 import { Iconify } from 'src/shared/components/iconify';
+
+import { usePermissions } from 'src/auth/hooks/use-permissions';
 
 // ----------------------------------------------------------------------
 

@@ -8,11 +8,12 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 
 import { Box, Input, Modal } from 'src/shared/ui';
 import { Label } from 'src/shared/components/label';
-import { usePermissions } from 'src/auth/hooks/use-permissions';
 import { Iconify } from 'src/shared/components/iconify';
 import { Scrollbar } from 'src/shared/components/scrollbar';
 import { canShowNavItem } from 'src/shared/components/nav-section';
 import { SearchNotFound } from 'src/shared/components/search-not-found';
+
+import { usePermissions } from 'src/auth/hooks/use-permissions';
 
 import { ResultItem } from './result-item';
 import { applyFilter, flattenNavSections } from './utils';
@@ -72,17 +73,22 @@ export function Searchbar({ data: navItems = [], className, ...other }: Searchba
     setSearchQuery(event.target.value);
   }, []);
 
+  const checkPermission = useCallback(
+    (permission?: string) => (permission ? can(permission) : false),
+    [can]
+  );
+
   const permittedNavItems = useMemo(
     () =>
       navItems
         .map((group) => ({
           ...group,
           items: group.items.filter((item) =>
-            canShowNavItem(item, undefined, can, canAny)
+            canShowNavItem(item, undefined, checkPermission, canAny)
           ),
         }))
         .filter((group) => group.items.length > 0),
-    [navItems, can, canAny]
+    [navItems, checkPermission, canAny]
   );
 
   const formattedNavItems = useMemo(

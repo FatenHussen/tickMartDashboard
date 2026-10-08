@@ -11,10 +11,11 @@ import { Box, Alert } from 'src/shared/ui';
 import { getFcmToken } from 'src/lib/firebase';
 import { Logo } from 'src/shared/components/logo';
 import { apiRoutes, axiosInstance } from 'src/api';
-import { can, canAny } from 'src/auth/permissions';
 import { useMockedUser } from 'src/pages/auth/hooks';
 import { useSettingsContext } from 'src/shared/components/settings';
 import { useAuthContext } from 'src/pages/auth/hooks/use-auth-context';
+
+import { can, canAny } from 'src/auth/permissions';
 
 import { NavMobile } from './nav-mobile';
 import { VerticalDivider } from './content';
