@@ -3,6 +3,7 @@ import type { AdminToggleEntityType } from '@/api/admin-toggle-status.types';
 
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
+import { Iconify } from '@/shared/components/iconify';
 import { readRecordActiveFlag } from '@/utils/parse-record-is-active';
 import { useAdminToggleStatus } from '@/hooks/use-admin-toggle-status';
 
@@ -21,13 +22,16 @@ function ToggleVisibilityColumnHeader<TData>({
   );
 }
 
+type ToggleAppearance = 'switch' | 'eye';
+
 interface ToggleCellProps {
   id: number;
   isActive: boolean;
   entityType: AdminToggleEntityType;
+  appearance?: ToggleAppearance;
 }
 
-function ToggleCell({ id, isActive, entityType }: ToggleCellProps) {
+function ToggleCell({ id, isActive, entityType, appearance = 'switch' }: ToggleCellProps) {
   const { t } = useTranslation('table');
   const toggleMutation = useAdminToggleStatus();
 
@@ -44,11 +48,50 @@ function ToggleCell({ id, isActive, entityType }: ToggleCellProps) {
         id,
         is_active: !isActive,
       });
-      toast.success(t('toggleVisibilitySuccess'));
+      toast.success(
+        appearance === 'eye'
+          ? isActive
+            ? t('productHiddenFromStorefront')
+            : t('productShownOnStorefront')
+          : t('toggleVisibilitySuccess')
+      );
     } catch {
       /* error toast handled by axios interceptor */
     }
   };
+
+  if (appearance === 'eye') {
+    const label = isActive ? t('hideFromStorefront') : t('showOnStorefront');
+    return (
+      <div className="flex w-full items-center justify-center">
+        <button
+          type="button"
+          aria-pressed={isActive}
+          aria-label={label}
+          title={label}
+          disabled={isPending}
+          onClick={(e) => {
+            e.stopPropagation();
+            void handleToggle();
+          }}
+          className={[
+            'flex h-9 w-9 items-center justify-center rounded-lg border transition-colors',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+            isActive
+              ? 'border-primary/25 bg-primary/10 text-primary hover:bg-primary/15'
+              : 'border-border/60 bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground',
+            isPending ? 'cursor-wait opacity-50' : 'cursor-pointer',
+          ].join(' ')}
+        >
+          <Iconify
+            icon={isActive ? 'solar:eye-bold' : 'solar:eye-closed-bold'}
+            width={18}
+            height={18}
+          />
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex w-full items-center justify-start">
@@ -59,7 +102,7 @@ function ToggleCell({ id, isActive, entityType }: ToggleCellProps) {
         disabled={isPending}
         onClick={(e) => {
           e.stopPropagation();
-          handleToggle();
+          void handleToggle();
         }}
         className={[
           'relative h-7 w-12 shrink-0 cursor-pointer rounded-full border border-border/40 transition-colors',
@@ -97,15 +140,17 @@ function resolveIsActive(
 interface CreateToggleColumnOptions<TData> {
   entityType: AdminToggleEntityType;
   getIsActive?: (row: TData) => boolean | undefined;
+  appearance?: ToggleAppearance;
 }
 
 export function createToggleColumn<TData>({
   entityType,
   getIsActive,
+  appearance = 'switch',
 }: CreateToggleColumnOptions<TData>): ColumnDef<TData> {
   return {
     id: 'toggle_active',
-    accessorKey: 'is_active',
+    accessorKey: appearance === 'eye' ? 'is_visible' : 'is_active',
     header: ToggleVisibilityColumnHeader,
     meta: {
       headerClassName: 'text-center',
@@ -118,7 +163,14 @@ export function createToggleColumn<TData>({
 
       if (id == null) return null;
 
-      return <ToggleCell  id={id} isActive={isActive} entityType={entityType} />;
+      return (
+        <ToggleCell
+          id={id}
+          isActive={isActive}
+          entityType={entityType}
+          appearance={appearance}
+        />
+      );
     },
     enableSorting: false,
   };

@@ -74,6 +74,7 @@ export interface ProductFormValues {
   approval_status?: string | null;
   approval_status_label?: string | null;
   is_active?: boolean | number;
+  is_visible?: boolean | number | string;
   [key: string]: any;
 }
 
@@ -491,7 +492,18 @@ export const productColumns = (
     },
   },
   ...(permissions.update
-    ? [createToggleColumn<ProductFormValues>({ entityType: 'product' })]
+    ? [
+        createToggleColumn<ProductFormValues>({
+          entityType: 'product',
+          appearance: 'eye',
+          getIsActive: (row) => {
+            const visible = row.is_visible ?? row.is_active;
+            if (visible === false || visible === 0 || visible === '0') return false;
+            if (visible === true || visible === 1 || visible === '1') return true;
+            return true;
+          },
+        }),
+      ]
     : []),
   {
     id: 'actions',

@@ -30,7 +30,9 @@ function patchItemsIsActive(
       data: {
         ...d,
         items: d.items.map((item) =>
-          item && String(item.id) === String(id) ? { ...item, is_active } : item
+          item && String(item.id) === String(id)
+            ? { ...item, is_active, is_visible: is_active }
+            : item
         ),
       },
     };
