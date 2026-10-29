@@ -4,11 +4,11 @@ import type {
   CategoryAttributeListResponse,
 } from '@/pages/dashboard/categories/types/category-attribute.types';
 
-import { useMemo, useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
+import { useMemo, useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { normalizeCatalogHex } from '@/pages/dashboard/colors/utils/catalog-hex';
 import { useActiveColorCatalog } from '@/pages/dashboard/colors/hooks/color';
+import { normalizeCatalogHex } from '@/pages/dashboard/colors/utils/catalog-hex';
 import { HexPaletteField } from '@/shared/components/hook-form/rhf-color-picker';
 import { isColorCategoryAttribute } from '@/pages/dashboard/categories/utils/color-attribute';
 import {
@@ -21,6 +21,7 @@ import {
 
 import { Box, Typography } from 'src/shared/ui';
 
+import { persistVariantShade } from '../utils/persist-variant-shade';
 import { VariantFieldLabel, ColorAttributeOption } from './variant-field-ui';
 import {
   sortedComboKey,
@@ -35,7 +36,6 @@ import {
   type CategoryAttributeValueRef,
   type CategoryAttributePickerRow,
 } from '../utils/variant-combinations';
-import { persistVariantShade } from '../utils/persist-variant-shade';
 
 // ----------------------------------------------------------------------
 
