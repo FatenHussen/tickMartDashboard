@@ -1,10 +1,9 @@
 import type { TFunction } from 'i18next';
 
-import React from 'react';
+import { useMemo } from 'react';
 import { toast } from 'react-toastify';
-import { queryKeys } from '@/api/queryKeys';
-import { useQuery } from '@tanstack/react-query';
-import { _ColorApi } from '@/pages/dashboard/colors/api/color.services';
+import { useActiveColorCatalog } from '@/pages/dashboard/colors/hooks/color';
+import { isColorCategoryAttribute } from '@/pages/dashboard/categories/utils/color-attribute';
 import {
   Select,
   SelectItem,
@@ -13,18 +12,20 @@ import {
   SelectTrigger,
 } from '@/shared/ui/select';
 
-import { Box } from 'src/shared/ui';
+import { Box, Typography } from 'src/shared/ui';
 
+import { VariantColorPalette } from './VariantColorPalette';
 import { VariantFieldLabel, ColorAttributeOption } from './variant-field-ui';
 import {
   sortedComboKey,
   attributeValueLabel,
   buildColorsHexLookup,
+  attributePickerValues,
   replaceAttributeValueId,
-  selectedValueIdForAttribute,
-  resolveCategoryAttributeValueHex,
-  type CategoryAttributePickerRow,
   type VariantAttributeRow,
+  selectedValueIdForAttribute,
+  type CategoryAttributePickerRow,
+  resolveCategoryAttributeValueHex,
 } from '../utils/variant-combinations';
 
 // ----------------------------------------------------------------------
@@ -41,6 +42,7 @@ export function AttributeSingleSelect({
   onChange,
   colorsHexLookup,
   formatAttributeLabel,
+  colorHint,
   resetNonce = 0,
 }: {
   attr: CategoryAttributePickerRow;
@@ -48,11 +50,26 @@ export function AttributeSingleSelect({
   onChange: (valueId: number) => void;
   colorsHexLookup: ReturnType<typeof buildColorsHexLookup>;
   formatAttributeLabel: (name: unknown) => string;
+  colorHint?: string;
   resetNonce?: number;
 }) {
-  const values = Array.isArray(attr.values) ? attr.values : [];
   const label = formatAttributeLabel(attr.name);
-  const isColor = String(attr.type ?? '').toLowerCase() === 'color';
+  const isColor = isColorCategoryAttribute(attr);
+  const values = attributePickerValues(attr, colorsHexLookup, selectedId);
+
+  if (isColor) {
+    return (
+      <Box className="min-w-0 space-y-1 sm:col-span-2 lg:col-span-3">
+        <VariantFieldLabel>{label}</VariantFieldLabel>
+        <VariantColorPalette attr={attr} selectedId={selectedId} onChange={onChange} />
+        {colorHint ? (
+          <Typography variant="caption" className="block text-muted-foreground">
+            {colorHint}
+          </Typography>
+        ) : null}
+      </Box>
+    );
+  }
 
   return (
     <Box className="min-w-0 space-y-1">
@@ -81,7 +98,7 @@ export function AttributeSingleSelect({
                 textValue={valLabel}
                 className="rounded-md py-2"
               >
-                {isColor ? (
+                {isColor && valHex ? (
                   <ColorAttributeOption hex={valHex} label={valLabel} />
                 ) : (
                   valLabel
@@ -91,6 +108,11 @@ export function AttributeSingleSelect({
           })}
         </SelectContent>
       </Select>
+      {isColor && colorHint ? (
+        <Typography variant="caption" className="block text-muted-foreground">
+          {colorHint}
+        </Typography>
+      ) : null}
     </Box>
   );
 }
@@ -117,15 +139,11 @@ export function VariantAttributeSelects({
   t,
   resetNonce = 0,
 }: Props) {
-  const { data: colorsResp } = useQuery({
-    queryKey: queryKeys.color.list({ per_page: 500, is_active: true, picker: 'variant-attribute-selects' }),
-    queryFn: () => _ColorApi.getListColors({ page: 1, per_page: 500, is_active: true }),
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data: colorItems } = useActiveColorCatalog();
 
-  const colorsHexLookup = React.useMemo(
-    () => buildColorsHexLookup(colorsResp?.data?.items ?? []),
-    [colorsResp?.data?.items]
+  const colorsHexLookup = useMemo(
+    () => buildColorsHexLookup(colorItems ?? []),
+    [colorItems]
   );
 
   if (categoryAttributes.length === 0) return null;
@@ -143,6 +161,9 @@ export function VariantAttributeSelects({
             resetNonce={resetNonce}
             colorsHexLookup={colorsHexLookup}
             formatAttributeLabel={formatAttributeLabel}
+            colorHint={
+              isColorCategoryAttribute(attr) ? t?.('form.productColorSwatchHint') : undefined
+            }
             onChange={(valueId) => {
               const nextIds = replaceAttributeValueId(selectedIds, attr, valueId > 0 ? valueId : null);
               if (existingComboKeys && nextIds.length > 0) {

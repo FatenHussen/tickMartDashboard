@@ -2,6 +2,10 @@
 
 export interface CategoryAttributeValue {
   id?: number;
+  /** `colors.id` for a color attribute. Not the attribute-value id. */
+  color_id?: number | null;
+  /** Copied from `colors.hex` when the value is linked. Display only. */
+  hex?: string | null;
   /** List payloads may send a display string; create/edit uses `{ ar, en }`. */
   name:
     | {
@@ -71,6 +75,8 @@ export interface CategoryAttributeCreateUpdatePayload {
   values?: Array<{
     /** Required on update for existing values so the backend keeps the same row/id. */
     id?: number;
+    /** Required on every color-attribute row that is sent. `colors.id`, not the value id. */
+    color_id?: number;
     name: {
       en: string;
       ar: string;

@@ -3,12 +3,20 @@ import type { ColorListParams, ColorCreatePayload } from '../types/color.types';
 import { queryKeys } from '@/api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { _ColorApi } from '../api/color.services';
+import { _ColorApi, listAllColors } from '../api/color.services';
 
 export const useFetchColors = (params?: ColorListParams) =>
   useQuery({
     queryKey: queryKeys.color.list(params as Record<string, unknown>),
     queryFn: () => _ColorApi.getListColors(params),
+  });
+
+/** Active shades from `colors`, including later pages. Shared by attribute and product forms. */
+export const useActiveColorCatalog = () =>
+  useQuery({
+    queryKey: queryKeys.color.list({ scope: 'active-catalog' }),
+    queryFn: () => listAllColors({ per_page: 200, is_active: true }),
+    staleTime: 5 * 60 * 1000,
   });
 
 export const useFetchColorById = (id: number | string) =>

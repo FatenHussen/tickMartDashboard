@@ -9,11 +9,9 @@ import type {
 } from 'react-hook-form';
 
 import React from 'react';
-import { queryKeys } from '@/api/queryKeys';
 import { Controller } from 'react-hook-form';
-import { useQuery } from '@tanstack/react-query';
 import { Iconify } from '@/shared/components/iconify';
-import { _ColorApi } from '@/pages/dashboard/colors/api/color.services';
+import { useActiveColorCatalog } from '@/pages/dashboard/colors/hooks/color';
 
 import { Box, Button, Typography } from 'src/shared/ui';
 
@@ -576,15 +574,11 @@ export function ProductVariantsCompactTable({
 }: ProductVariantsCompactTableProps) {
   const [openIndex, setOpenIndex] = React.useState<number | null>(null);
 
-  const { data: colorsResp } = useQuery({
-    queryKey: queryKeys.color.list({ per_page: 500, is_active: true, picker: 'variant-table' }),
-    queryFn: () => _ColorApi.getListColors({ page: 1, per_page: 500, is_active: true }),
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data: colorItems } = useActiveColorCatalog();
 
   const colorsHexLookup = React.useMemo(
-    () => buildColorsHexLookup(colorsResp?.data?.items ?? []),
-    [colorsResp?.data?.items]
+    () => buildColorsHexLookup(colorItems ?? []),
+    [colorItems]
   );
 
   const detailColSpan =

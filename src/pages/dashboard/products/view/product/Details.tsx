@@ -15,10 +15,12 @@ import { formatTranslated } from '@/utils/format-translated';
 import { getApiErrorMessage } from '@/lib/get-api-error-message';
 import { resolveStorageImageUrl } from '@/utils/shop-variant-image';
 import { iconArtworkSrc } from '@/pages/dashboard/icons/utils/icon-artwork';
+import { useActiveColorCatalog } from '@/pages/dashboard/colors/hooks/color';
 import { useFetchProductById } from '@/pages/dashboard/products/hooks/product';
 import { useRootCategoryId } from '@/pages/dashboard/categories/hooks/category';
 import { useFetchCurrencies } from '@/pages/dashboard/currencies/hooks/currency';
 import { useUpdateProductVariant } from '@/pages/dashboard/products/hooks/product-variant';
+import { isColorCategoryAttribute } from '@/pages/dashboard/categories/utils/color-attribute';
 import { useVariantDeleteFlow } from '@/pages/dashboard/products/hooks/use-variant-delete-flow';
 import { useFetchCategoryAttributes } from '@/pages/dashboard/categories/hooks/category-attribute';
 import { VariantAttributeSelects } from '@/pages/dashboard/products/components/VariantAttributeSelects';
@@ -30,17 +32,6 @@ import {
   normalizeVariantExistingImages,
   extractVariantAttributeValueIds,
 } from '@/pages/dashboard/products/utils/variant-payload';
-import {
-  priceAfterDiscount,
-  attributeValueLabel,
-  sanitizeEnglishSkuInput,
-  resolveAttributeValueId,
-  generateRandomVariantSku,
-  mergeVariantAttributeValueIds,
-  toCategoryAttributePickerRows,
-  type CategoryAttributePickerRow,
-  ensureCategoryAttributesFromVariants,
-} from '@/pages/dashboard/products/utils/variant-combinations';
 import {
   ProductDetailsTag,
   ProductDetailsChip,
@@ -55,6 +46,20 @@ import {
   ProductDetailsPricingSummary,
   ProductDetailsDualCurrencyInline,
 } from '@/pages/dashboard/products/components/product-details-ui';
+import {
+  priceAfterDiscount,
+  attributeValueLabel,
+  buildColorsHexLookup,
+  sanitizeEnglishSkuInput,
+  resolveAttributeValueId,
+  generateRandomVariantSku,
+  mergeVariantAttributeValueIds,
+  toCategoryAttributePickerRows,
+  variantPointsAtUncoloredShade,
+  type CategoryAttributePickerRow,
+  resolveCategoryAttributeValueHex,
+  ensureCategoryAttributesFromVariants,
+} from '@/pages/dashboard/products/utils/variant-combinations';
 
 import { paths } from 'src/routes/paths';
 
@@ -357,6 +362,10 @@ function EditVariantModal({
       categoryAttributes,
       variant?.attributes
     );
+    if (variantPointsAtUncoloredShade(categoryAttributes, nextAttrIds)) {
+      toast.error(t('form.productColorSaveBlocked'));
+      return;
+    }
     const originalIds = normalizeVariantExistingImages(variant.images).map((img) => img.id);
     const imageFields = variantImageFieldsFromRow({
       images: newImages,
@@ -798,6 +807,11 @@ export default function DetailsPage() {
           ?.variants ?? []
       ),
     [categoryAttributesAll, productResponse]
+  );
+  const { data: colorItems } = useActiveColorCatalog();
+  const colorsHexLookup = useMemo(
+    () => buildColorsHexLookup(colorItems ?? []),
+    [colorItems]
   );
 
   const [editVariant, setEditVariant] = useState<any>(null);
@@ -1277,16 +1291,29 @@ export default function DetailsPage() {
                                   const val = (attr.values ?? []).find(
                                     (item) => Number(item.id) === selectedId
                                   );
+                                  const variantAttr = variant.attributes?.find(
+                                    (a: {
+                                      category_attribute_id?: number;
+                                      hex?: string | null;
+                                      color_id?: number | null;
+                                      value?: string;
+                                    }) => Number(a.category_attribute_id) === Number(attr.id)
+                                  );
                                   const valueLabel =
                                     attributeValueLabel(val?.name) ||
-                                    toDisplayString(
-                                      variant.attributes?.find(
-                                        (a: { category_attribute_id?: number }) =>
-                                          Number(a.category_attribute_id) === Number(attr.id)
-                                      )?.value
-                                    ) ||
+                                    toDisplayString(variantAttr?.value) ||
                                     '—';
-                                  const isColor = String(attr.type ?? '').toLowerCase() === 'color';
+                                  const isColor = isColorCategoryAttribute(attr);
+                                  const hex = isColor
+                                    ? resolveCategoryAttributeValueHex(
+                                        val ?? {
+                                          id: selectedId ?? 0,
+                                          hex: variantAttr?.hex,
+                                          color_id: variantAttr?.color_id,
+                                        },
+                                        colorsHexLookup
+                                      )
+                                    : null;
                                   return (
                                     <ProductDetailsTag
                                       key={attr.id}
@@ -1295,19 +1322,31 @@ export default function DetailsPage() {
                                         ''
                                       )}
                                       value={valueLabel}
-                                      colorDot={isColor ? valueLabel : undefined}
+                                      colorDot={hex ?? undefined}
                                     />
                                   );
                                 })
                               : variant.attributes.map((attr: any, ai: number) => {
                                   const attrValue = toDisplayString(attr.value);
-                                  const isColor = attr.type === 'color';
+                                  const hex = isColorCategoryAttribute({
+                                    type: attr.type,
+                                    name: attr.attribute,
+                                  })
+                                    ? resolveCategoryAttributeValueHex(
+                                        {
+                                          id: Number(attr.id) || 0,
+                                          hex: attr.hex,
+                                          color_id: attr.color_id,
+                                        },
+                                        colorsHexLookup
+                                      )
+                                    : null;
                                   return (
                                     <ProductDetailsTag
                                       key={attr.id ?? ai}
                                       label={toDisplayString(attr.attribute)}
                                       value={attrValue}
-                                      colorDot={isColor ? attrValue : undefined}
+                                      colorDot={hex ?? undefined}
                                     />
                                   );
                                 })}

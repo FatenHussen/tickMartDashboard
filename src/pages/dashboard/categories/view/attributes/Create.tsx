@@ -12,11 +12,9 @@ import { useForm, useWatch, Controller, useFieldArray } from 'react-hook-form';
 import { _CategoryApi } from '@/pages/dashboard/categories/api/category.services';
 import { RHFInfiniteSelect } from '@/shared/components/hook-form/rhf-infinite-select';
 import { isRootCategory } from '@/pages/dashboard/categories/utils/category-cascade-shared';
+import { isColorCategoryAttribute } from '@/pages/dashboard/categories/utils/color-attribute';
 import { paginateSelectRowsLocal } from '@/pages/dashboard/categories/utils/build-parent-picker-options';
-import {
-  toCategoryAttributeValueFormRow,
-  toCategoryAttributeValuePayload,
-} from '@/pages/dashboard/categories/utils/category-attribute-values';
+import { CategoryAttributeColorValues } from '@/pages/dashboard/categories/components/category-attribute-color-values';
 import {
   CategoryAttributeSchema,
   type CategoryAttributeFormValues,
@@ -26,6 +24,11 @@ import {
   useUpdateCategoryAttribute,
   useFetchCategoryAttributeById,
 } from '@/pages/dashboard/categories/hooks/category-attribute';
+import {
+  parseCategoryAttributeValueId,
+  toCategoryAttributeValueFormRow,
+  toCategoryAttributeValuePayload,
+} from '@/pages/dashboard/categories/utils/category-attribute-values';
 
 import { CONFIG } from 'src/global-config';
 import { Box, Button, Typography, SimpleSelect } from 'src/shared/ui';
@@ -40,12 +43,6 @@ function categoryListLabel(cat: Pick<CategoryData, 'name'>): string {
   return typeof cat.name === 'object' && cat.name !== null
     ? formatTranslated(cat.name as { en?: string; ar?: string })
     : String(cat.name ?? '');
-}
-
-function hexForDisplay(value: string | undefined) {
-  const raw = value?.trim().replace(/\s/g, '') ?? '';
-  if (!raw) return '';
-  return raw.startsWith('#') ? raw : `#${raw}`;
 }
 
 export default function CreatePage() {
@@ -93,9 +90,16 @@ export default function CreatePage() {
     defaultValues,
   });
 
-  const { handleSubmit, reset, control, setValue, formState } = methods;
+  const { handleSubmit, reset, control, setValue, setError, formState } = methods;
   const attributeType = useWatch({ control, name: 'type' });
+  const nameEn = useWatch({ control, name: 'name.en' });
+  const nameAr = useWatch({ control, name: 'name.ar' });
   const watchedValues = useWatch({ control, name: 'values' });
+  const clearedColorPlaceholder = useRef(false);
+  const isColorAttribute = isColorCategoryAttribute({
+    type: attributeType,
+    name: { en: nameEn ?? '', ar: nameAr ?? '' },
+  });
   const { fields, append, remove } = useFieldArray({
     control,
     name: 'values',
@@ -129,10 +133,10 @@ export default function CreatePage() {
         name: attribute.name,
         type: attribute.type,
         values:
-          attribute.type === 'color'
-            ? []
-            : attribute.values?.length > 0
-              ? attribute.values.map(toCategoryAttributeValueFormRow)
+          attribute.values?.length > 0
+            ? attribute.values.map(toCategoryAttributeValueFormRow)
+            : isColorCategoryAttribute(attribute)
+              ? []
               : [{ name: { en: '', ar: '' } }],
       });
     }
@@ -145,17 +149,29 @@ export default function CreatePage() {
   ]);
 
   useEffect(() => {
-    if (attributeType === 'color') {
-      if (!isEditMode && watchedValues.length > 0) {
-        setValue('values', [], { shouldValidate: true, shouldDirty: true });
+    const rows = watchedValues ?? [];
+    if (!isColorAttribute) {
+      clearedColorPlaceholder.current = false;
+      if (rows.length === 0) {
+        setValue('values', [{ name: { en: '', ar: '' } }], { shouldValidate: true });
       }
       return;
     }
 
-    if (watchedValues.length === 0) {
-      setValue('values', [{ name: { en: '', ar: '' } }], { shouldValidate: true });
+    if (isEditMode || clearedColorPlaceholder.current) return;
+
+    const meaningful = rows.some(
+      (row) =>
+        parseCategoryAttributeValueId(row?.id) != null ||
+        parseCategoryAttributeValueId(row?.color_id) != null ||
+        Boolean(row?.name?.en?.trim()) ||
+        Boolean(row?.name?.ar?.trim())
+    );
+    clearedColorPlaceholder.current = true;
+    if (!meaningful && rows.length > 0) {
+      setValue('values', [], { shouldValidate: true });
     }
-  }, [attributeType, watchedValues, setValue, isEditMode]);
+  }, [isColorAttribute, isEditMode, watchedValues, setValue]);
 
   const isSubmitting =
     createCategoryAttributeMutation.isPending || updateCategoryAttributeMutation.isPending;
@@ -172,7 +188,27 @@ export default function CreatePage() {
         return;
       }
 
+      const colorAttribute = isColorCategoryAttribute(data);
       const valuesTouched = Boolean(formState.dirtyFields.values);
+      // Create with no rows links the full colors palette. Update with untouched
+      // rows keeps the current values. A sent row must include color_id.
+      const sendValues = colorAttribute
+        ? data.values.length > 0 && (!isEditMode || valuesTouched)
+        : !isEditMode || valuesTouched;
+      if (
+        sendValues &&
+        colorAttribute &&
+        data.values.some((row) => parseCategoryAttributeValueId(row.color_id) == null)
+      ) {
+        data.values.forEach((row, index) => {
+          if (parseCategoryAttributeValueId(row.color_id) != null) return;
+          setError(`values.${index}.color_id`, {
+            type: 'manual',
+            message: t('categoryAttribute.colorIdRequired', { ns: 'validation' }),
+          });
+        });
+        return;
+      }
       const payload = {
         category_id: data.category_id,
         name: {
@@ -180,9 +216,11 @@ export default function CreatePage() {
           ar: data.name.ar,
         },
         type: data.type,
-        ...(data.type !== 'color' && (!isEditMode || valuesTouched)
+        ...(sendValues
           ? {
-              values: data.values.map(toCategoryAttributeValuePayload),
+              values: data.values.map((row) =>
+                toCategoryAttributeValuePayload(row, { includeColorId: colorAttribute })
+              ),
             }
           : {}),
       };
@@ -365,49 +403,17 @@ export default function CreatePage() {
           </Box>
         </Box>
 
-        {/* ── Section: Color Values (edit mode only) ── */}
-        {isEditMode && attributeType === 'color' && (
-          <Box className="rounded-2xl border border-border/50 bg-card/50 shadow-sm">
-            <Box className="flex items-center gap-3 px-6 py-4 border-b border-border/40 bg-gradient-to-r from-rose-500/[0.06] via-rose-500/[0.02] to-transparent">
-              <Box className="h-8 w-8 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0">
-                <Iconify icon="solar:palette-bold" className="text-rose-500" width={15} />
-              </Box>
-              <Typography variant="subtitle2" className="font-semibold text-foreground">
-                {t('form.attributeValuesSection')}
-              </Typography>
-            </Box>
-            <Box className="p-6">
-              <Typography variant="caption" className="text-muted-foreground block mb-4">
-                {t('form.attributeColorValuesReadOnlyHint')}
-              </Typography>
-              <Box className="flex flex-wrap gap-3 p-4 border border-border/60 rounded-xl bg-muted/20">
-                {(categoryAttributeData?.data?.values ?? []).map((val) => {
-                  const enName = typeof val.name === 'string' ? val.name : val.name?.en;
-                  const arName = typeof val.name === 'string' ? val.name : val.name?.ar;
-                  const hex = hexForDisplay(enName || arName);
-                  return (
-                    <Box
-                      key={val.id ?? `${hex}-${enName}-${arName}`}
-                      className="flex flex-col items-center gap-1"
-                      title={hex}
-                    >
-                      <Box
-                        className="h-10 w-10 shrink-0 rounded-full border border-border shadow-sm"
-                        style={{ backgroundColor: hex || undefined }}
-                      />
-                      <Typography variant="caption" className="text-muted-foreground max-w-[4.5rem] truncate">
-                        {hex || '—'}
-                      </Typography>
-                    </Box>
-                  );
-                })}
-              </Box>
-            </Box>
-          </Box>
-        )}
+        {isColorAttribute ? (
+          <CategoryAttributeColorValues
+            isEditMode={isEditMode}
+            fields={fields}
+            append={append}
+            remove={remove}
+          />
+        ) : null}
 
         {/* ── Section: Attribute Values ── */}
-        {attributeType !== 'color' && (
+        {!isColorAttribute && (
           <Box className="rounded-2xl border border-amber-500/25 bg-card/50 shadow-sm overflow-hidden">
             <Box className="border-b border-border/40 bg-gradient-to-r from-amber-500/[0.08] via-amber-500/[0.03] to-transparent px-6 py-5">
               <Box className="flex items-center gap-3">

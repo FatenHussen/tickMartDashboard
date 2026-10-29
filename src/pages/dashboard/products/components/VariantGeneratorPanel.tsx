@@ -2,10 +2,8 @@ import type { TFunction } from 'i18next';
 
 import React from 'react';
 import { toast } from 'react-toastify';
-import { queryKeys } from '@/api/queryKeys';
-import { useQuery } from '@tanstack/react-query';
 import { Iconify } from '@/shared/components/iconify';
-import { _ColorApi } from '@/pages/dashboard/colors/api/color.services';
+import { useActiveColorCatalog } from '@/pages/dashboard/colors/hooks/color';
 
 import { Box, Button, Typography } from 'src/shared/ui';
 
@@ -58,15 +56,11 @@ export function VariantGeneratorPanel({
   const [selections, setSelections] = React.useState<Record<number, number>>({});
   const [resetNonce, setResetNonce] = React.useState(0);
 
-  const { data: colorsResp } = useQuery({
-    queryKey: queryKeys.color.list({ per_page: 500, is_active: true, picker: 'variant-generator' }),
-    queryFn: () => _ColorApi.getListColors({ page: 1, per_page: 500, is_active: true }),
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data: colorItems } = useActiveColorCatalog();
 
   const colorsHexLookup = React.useMemo(
-    () => buildColorsHexLookup(colorsResp?.data?.items ?? []),
-    [colorsResp?.data?.items]
+    () => buildColorsHexLookup(colorItems ?? []),
+    [colorItems]
   );
 
   const selectedCombo = React.useMemo(

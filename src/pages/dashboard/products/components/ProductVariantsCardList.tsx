@@ -9,10 +9,8 @@ import type {
 } from 'react-hook-form';
 
 import React from 'react';
-import { queryKeys } from '@/api/queryKeys';
-import { useQuery } from '@tanstack/react-query';
 import { Iconify } from '@/shared/components/iconify';
-import { _ColorApi } from '@/pages/dashboard/colors/api/color.services';
+import { useActiveColorCatalog } from '@/pages/dashboard/colors/hooks/color';
 
 import { Box, Typography } from 'src/shared/ui';
 
@@ -69,15 +67,11 @@ export function ProductVariantsCardList({
   onSave,
   ...rowProps
 }: ProductVariantsCardListProps) {
-  const { data: colorsResp } = useQuery({
-    queryKey: queryKeys.color.list({ per_page: 500, is_active: true, picker: 'variant-cards' }),
-    queryFn: () => _ColorApi.getListColors({ page: 1, per_page: 500, is_active: true }),
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data: colorItems } = useActiveColorCatalog();
 
   const colorsHexLookup: ColorsHexLookup = React.useMemo(
-    () => buildColorsHexLookup(colorsResp?.data?.items ?? []),
-    [colorsResp?.data?.items]
+    () => buildColorsHexLookup(colorItems ?? []),
+    [colorItems]
   );
 
   const [openIndex, setOpenIndex] = React.useState<number | null>(null);

@@ -150,6 +150,7 @@ export interface ProductDetailData {
       value: string;
       type: string;
       hex?: string | null;
+      color_id?: number | null;
       category_attribute_id?: number;
     }>;
     /** Sale price/stock now live on the variant itself — shared across every shop. */

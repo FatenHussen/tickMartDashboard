@@ -68,6 +68,7 @@ import {
   resolveAttributeValuesByIds,
   mergeVariantAttributeValueIds,
   toCategoryAttributePickerRows,
+  variantPointsAtUncoloredShade,
   ensureCategoryAttributesFromVariants,
 } from '@/pages/dashboard/products/utils/variant-combinations';
 
@@ -1863,6 +1864,16 @@ export default function CreatePage() {
   const onSubmit = async (data: ProductFormValues) => {
     try {
       const live = getValues();
+      const uncoloredShade = (live.variants ?? []).some((row) =>
+        variantPointsAtUncoloredShade(
+          categoryAttributes,
+          (row.attributes_values_ids ?? []).map(Number)
+        )
+      );
+      if (uncoloredShade) {
+        toast.error(t('form.productColorSaveBlocked'));
+        return;
+      }
       const imagesFromForm = filterFileList(getValues('images'));
       const imagesFromParsed = filterFileList(data.images);
       // Edit mode: validation can pass via existing_media_ids while zod omits new Files from `data`
@@ -2362,6 +2373,10 @@ export default function CreatePage() {
         categoryAttributes,
         apiVariant?.attributes
       );
+      if (variantPointsAtUncoloredShade(categoryAttributes, attrIds)) {
+        toast.error(t('form.productColorSaveBlocked'));
+        return;
+      }
 
       if (variantId) {
         try {
