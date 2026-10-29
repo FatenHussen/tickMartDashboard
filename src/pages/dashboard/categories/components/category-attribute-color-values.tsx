@@ -3,6 +3,7 @@ import type { ColorListItem } from '@/pages/dashboard/colors/types/color.types';
 import type { CategoryAttributeFormValues } from '@/pages/dashboard/categories/validation/category-attribute.validation';
 
 import { Link } from 'react-router';
+import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
 import { Iconify } from '@/shared/components/iconify';
 import { useWatch, useFormContext } from 'react-hook-form';
@@ -152,17 +153,29 @@ export function CategoryAttributeColorValues({
     const currentHex = normalizeCatalogHex(getValues(`values.${index}.hex`));
     if (currentId && currentHex === hex) return;
 
-    const existing = findColorByHex(catalog, hex);
-    if (existing) {
-      linkShade(index, existing.id, hex);
+    const known = findColorByHex(catalog, hex);
+    if (known) {
+      linkShade(index, known.id, hex);
+      return;
+    }
+
+    const listed = await _ColorApi.getListColors({ hex, per_page: 20 });
+    const stored = findColorByHex(listed.data?.items ?? [], hex);
+    if (stored) {
+      linkShade(index, stored.id, hex);
       return;
     }
 
     const currentName = getValues(`values.${index}.name`);
-    const en = currentName?.en?.trim() || hex;
-    const ar = currentName?.ar?.trim() || en;
+    const en = currentName?.en?.trim() ?? '';
+    const ar = currentName?.ar?.trim() ?? '';
+    if (!en && !ar) {
+      toast.error(t('form.attributeColorNameBeforeShade'));
+      throw new Error('color name is required');
+    }
+
     const created = await createColor.mutateAsync({
-      name: { en, ar },
+      name: { en: en || ar, ar: ar || en },
       hex,
       is_active: true,
     });
@@ -171,7 +184,7 @@ export function CategoryAttributeColorValues({
     setExtraColors((current) => [
       {
         id: newId,
-        name: en,
+        name: en || ar,
         hex,
         is_active: true,
         created_at: '',
@@ -179,7 +192,7 @@ export function CategoryAttributeColorValues({
       },
       ...current.filter((color) => color.id !== newId),
     ]);
-    linkShade(index, newId, hex, { en, ar });
+    linkShade(index, newId, hex, { en: en || ar, ar: ar || en });
   };
 
   return (
@@ -211,15 +224,13 @@ export function CategoryAttributeColorValues({
         {fields.map((field, index) => {
           const colorId = parseCategoryAttributeValueId(watchedValues?.[index]?.color_id);
           const linked = colorId ? catalog.find((color) => color.id === colorId) : undefined;
-          const savedHex =
-            normalizeCatalogHex(linked?.hex) ?? normalizeCatalogHex(watchedValues?.[index]?.hex);
-          const showUnlinked = colorId == null;
+          const savedHex = colorId
+            ? normalizeCatalogHex(linked?.hex) ?? normalizeCatalogHex(watchedValues?.[index]?.hex)
+            : null;
           return (
             <Box
               key={field.fieldKey}
-              className={`space-y-3 rounded-xl border p-4 ${
-                showUnlinked ? 'border-rose-500/40 bg-rose-500/[0.04]' : 'border-border/60 bg-muted/25'
-              }`}
+              className="space-y-3 rounded-xl border border-border/60 bg-muted/25 p-4"
             >
               <Box className="flex flex-wrap items-center justify-between gap-3">
                 <Typography variant="subtitle2" className="font-semibold text-foreground">
@@ -254,7 +265,7 @@ export function CategoryAttributeColorValues({
                   onCommit={(hex) => persistShade(index, hex)}
                 />
                 <input type="hidden" {...register(`values.${index}.hex`)} />
-                {showUnlinked ? (
+                {colorId == null ? (
                   <Typography variant="caption" className="mt-1.5 block text-rose-600">
                     {t('form.attributeColorUnlinked')}
                   </Typography>

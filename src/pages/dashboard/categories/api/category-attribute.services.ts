@@ -26,7 +26,7 @@ export type CategoryAttributeListParams = {
 /**
  * Wire format: `values[0][id]=160` + `values[0][color_id]=31` + `values[0][name][en]=2`.
  * Existing rows keep `id` so a rename updates the same DB row.
- * Color attributes must send `color_id` (`colors.id`) on every row that is included.
+ * A shade is optional. `color_id` (`colors.id`) is sent only when the row has one.
  * Omit the `values` key entirely when the caller did not pass it.
  */
 function buildCategoryAttributeFormData(
@@ -121,43 +121,6 @@ export const _CategoryAttributeApi = {
       buildCategoryAttributeFormData(data)
     );
     return response.data;
-  },
-  /**
-   * Writes the shade name and palette hex into `colors`, then links the
-   * category value. Pass `attribute_value_id` for a grey text value so that
-   * same option id receives the hex.
-   */
-  savePaletteShade: async (
-    attributeId: number | string,
-    data: {
-      color_id?: number;
-      hex?: string;
-      name?: { en?: string; ar?: string };
-      attribute_value_id?: number;
-    }
-  ): Promise<{
-    id: number;
-    name: { en?: string; ar?: string } | string;
-    color_id: number;
-    hex: string;
-  }> => {
-    const response = await axiosInstance.post(
-      apiRoutes.categoryAttribute.paletteShade(attributeId),
-      data
-    );
-    const body = response.data?.data ?? response.data;
-    const id = Number(body?.id);
-    const colorId = Number(body?.color_id);
-    const hex = typeof body?.hex === 'string' ? body.hex : '';
-    if (!Number.isInteger(id) || id <= 0 || !hex) {
-      throw new Error('palette-shade response is missing id or hex');
-    }
-    return {
-      id,
-      name: body?.name ?? '',
-      color_id: Number.isInteger(colorId) && colorId > 0 ? colorId : 0,
-      hex,
-    };
   },
   updateCategoryAttribute: async (
     id: number | string,

@@ -44,7 +44,8 @@ export function toCategoryAttributeValueFormRow(
   return {
     ...(id != null ? { id } : {}),
     ...(colorId != null ? { color_id: colorId } : {}),
-    ...(hex ? { hex } : {}),
+    // A hex without color_id is only a display guess. The shade is the colors row.
+    ...(colorId != null && hex ? { hex } : {}),
     name,
   };
 }
@@ -53,6 +54,16 @@ export function toCategoryAttributeValueFormRow(
  * Existing rows keep `id` so PUT updates the same DB row (products stay linked).
  * New rows omit `id` so the backend inserts a new value.
  */
+/** Stable key so an edit sends `values` only when a row actually changed. */
+export function categoryAttributeValuesKey(
+  rows: CategoryAttributeValueFormRow[],
+  includeColorId: boolean
+): string {
+  return JSON.stringify(
+    rows.map((row) => toCategoryAttributeValuePayload(row, { includeColorId }))
+  );
+}
+
 export function toCategoryAttributeValuePayload(
   row: CategoryAttributeValueFormRow,
   options?: { includeColorId?: boolean }

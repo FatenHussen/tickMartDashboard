@@ -18,13 +18,13 @@ import { Box, Button, Typography } from 'src/shared/ui';
 import { VariantImagesField } from './VariantImagesField';
 import { toOptionalDiscount } from './variant-field-helpers';
 import {
+  linkedShadeHex,
   generateVariantSku,
   priceAfterDiscount,
   attributeValueLabel,
   buildColorsHexLookup,
   type ColorsHexLookup,
   type CategoryAttributeValueRef,
-  resolveCategoryAttributeValueHex,
 } from '../utils/variant-combinations';
 
 // ----------------------------------------------------------------------
@@ -173,7 +173,7 @@ function VariantTableRow({
           <Box className="flex flex-wrap gap-0.5 max-w-[8rem]">
             {valueRefs.length > 0 ? (
               valueRefs.map((val) => {
-                const valHex = resolveCategoryAttributeValueHex(val, colorsHexLookup);
+                const valHex = linkedShadeHex(val, colorsHexLookup);
                 return (
                 <span
                   key={val.id}

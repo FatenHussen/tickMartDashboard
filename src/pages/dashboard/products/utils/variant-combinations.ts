@@ -57,6 +57,20 @@ export function resolveCategoryAttributeValueHex(
   return null;
 }
 
+/**
+ * Circle hex only when the value is linked to a `colors` row that has a valid hex.
+ * A hex without `color_id` is not a shade, so the circle stays empty.
+ */
+export function linkedShadeHex(
+  value: CategoryAttributeValueRef | null | undefined,
+  lookup?: ColorsHexLookup | null
+): string | null {
+  if (!value) return null;
+  const colorId = Number(value.color_id);
+  if (!Number.isInteger(colorId) || colorId <= 0) return null;
+  return resolveCategoryAttributeValueHex(value, lookup);
+}
+
 export type VariantCombinationSelection = {
   categoryAttributeId: number;
   valueIds: number[];
@@ -355,8 +369,8 @@ function parsePositiveId(value: unknown): number | null {
 }
 
 /**
- * Color lists show only values linked to a `colors` row with a valid hex.
- * The current selection stays visible so a re-save does not drop text such as "2".
+ * Color lists offer only values linked to a `colors` row with a valid hex.
+ * The current selection stays, as text, so a re-save does not drop "2" or "7".
  */
 export function attributePickerValues(
   attribute: CategoryAttributePickerRow,
@@ -367,23 +381,8 @@ export function attributePickerValues(
   if (!isColorCategoryAttribute(attribute)) return values;
   return values.filter((value) => {
     if (selectedId > 0 && Number(value.id) === selectedId) return true;
-    return resolveCategoryAttributeValueHex(value, lookup) != null;
+    return linkedShadeHex(value, lookup) != null;
   });
-}
-
-/** True when a variant still points at a color value with no `hex`. Product save rejects that. */
-export function variantPointsAtUncoloredShade(
-  categoryAttributes: CategoryAttributePickerRow[],
-  valueIds: number[]
-): boolean {
-  for (const attribute of categoryAttributes) {
-    if (!isColorCategoryAttribute(attribute)) continue;
-    const selected = selectedValueIdForAttribute(valueIds, attribute);
-    if (selected == null) continue;
-    const value = (attribute.values ?? []).find((row) => Number(row.id) === selected);
-    if (resolveCategoryAttributeValueHex(value ?? { id: selected }) == null) return true;
-  }
-  return false;
 }
 
 /** Selected value for this attribute from `attributes_values_ids` ∩ `values[].id`. */
@@ -413,6 +412,23 @@ export function resolveAttributeValueId(
     (item) => parsePositiveId(item.category_attribute_id) === attributeId
   );
   return parsePositiveId(row?.id ?? row?.value_id);
+}
+
+/** Ids still present on the loaded category attributes. A deleted value must not be re-sent. */
+export function retainCatalogAttributeValueIds(
+  ids: number[],
+  categoryAttributes: CategoryAttributePickerRow[]
+): number[] {
+  if (categoryAttributes.length === 0) return ids;
+  const known = new Set<number>();
+  for (const attribute of categoryAttributes) {
+    for (const value of attribute.values ?? []) {
+      const id = parsePositiveId(value.id);
+      if (id != null) known.add(id);
+    }
+  }
+  if (known.size === 0) return ids;
+  return ids.filter((id) => known.has(id));
 }
 
 /** Fill empty attribute slots from GET — never drop size when the form only has color. */
@@ -446,8 +462,40 @@ export function mergeVariantAttributeValueIds(
     push(resolveAttributeValueId(api, attr, variantAttributes));
   }
 
-  for (const id of form) push(id);
-  return result;
+  return retainCatalogAttributeValueIds(result, categoryAttributes);
+}
+
+/**
+ * Swap this color attribute's value for `nextValueId` and drop ids that are
+ * not on any loaded attribute. A deleted id otherwise fails
+ * `attributes_values_ids` exists validation.
+ */
+export function replaceColorAttributeValueId(
+  selectedIds: number[],
+  attributes: CategoryAttributePickerRow[],
+  colorAttribute: CategoryAttributePickerRow,
+  nextValueId: number
+): number[] {
+  const thisIds = new Set(
+    (colorAttribute.values ?? [])
+      .map((val) => parsePositiveId(val.id))
+      .filter((id): id is number => id != null)
+  );
+  const known = new Set<number>([nextValueId]);
+  for (const attr of attributes) {
+    for (const val of attr.values ?? []) {
+      const id = parsePositiveId(val.id);
+      if (id != null) known.add(id);
+    }
+  }
+
+  const kept = selectedIds
+    .map(parsePositiveId)
+    .filter(
+      (id): id is number =>
+        id != null && known.has(id) && !thisIds.has(id) && id !== nextValueId
+    );
+  return [...new Set([...kept, nextValueId])];
 }
 
 /** Replace this attribute's value in `attributes_values_ids` — other attributes stay put. */

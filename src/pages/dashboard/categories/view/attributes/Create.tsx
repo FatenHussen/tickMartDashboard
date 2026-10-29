@@ -25,6 +25,7 @@ import {
   useFetchCategoryAttributeById,
 } from '@/pages/dashboard/categories/hooks/category-attribute';
 import {
+  categoryAttributeValuesKey,
   parseCategoryAttributeValueId,
   toCategoryAttributeValueFormRow,
   toCategoryAttributeValuePayload,
@@ -90,7 +91,9 @@ export default function CreatePage() {
     defaultValues,
   });
 
-  const { handleSubmit, reset, control, setValue, setError, formState } = methods;
+  const { handleSubmit, reset, control, setValue, getValues, formState } = methods;
+  const loadedValuesKey = useRef('');
+  const hydratedAttributeId = useRef<number | null>(null);
   const attributeType = useWatch({ control, name: 'type' });
   const nameEn = useWatch({ control, name: 'name.en' });
   const nameAr = useWatch({ control, name: 'name.ar' });
@@ -119,33 +122,44 @@ export default function CreatePage() {
 
   // Fetch category attribute data if in edit mode
   useEffect(() => {
-    if (isEditMode && categoryAttributeData?.data && !isLoadingAttribute && flatItems.length > 0) {
-      const attribute = categoryAttributeData.data;
-      const directId = attribute.category_id ?? attribute.root_category_id;
-      let categoryId = directId != null && directId > 0 ? directId : 0;
-      if (!categoryId) {
-        const target = attribute.category?.trim() ?? '';
-        const found = flatItems.find((cat) => categoryListLabel(cat).trim() === target);
-        categoryId = found?.id ?? 0;
-      }
-      reset({
-        category_id: categoryId,
-        name: attribute.name,
-        type: attribute.type,
-        values:
-          attribute.values?.length > 0
-            ? attribute.values.map(toCategoryAttributeValueFormRow)
-            : isColorCategoryAttribute(attribute)
-              ? []
-              : [{ name: { en: '', ar: '' } }],
-      });
+    if (!isEditMode) {
+      hydratedAttributeId.current = null;
+      loadedValuesKey.current = '';
+      return;
     }
+    if (!categoryAttributeData?.data || isLoadingAttribute || flatItems.length === 0) return;
+    const attribute = categoryAttributeData.data;
+    if (hydratedAttributeId.current === attribute.id && formState.isDirty) return;
+
+    const directId = attribute.category_id ?? attribute.root_category_id;
+    let categoryId = directId != null && directId > 0 ? directId : 0;
+    if (!categoryId) {
+      const target = attribute.category?.trim() ?? '';
+      const found = flatItems.find((cat) => categoryListLabel(cat).trim() === target);
+      categoryId = found?.id ?? 0;
+    }
+    const colorAttribute = isColorCategoryAttribute(attribute);
+    const values =
+      attribute.values?.length > 0
+        ? attribute.values.map(toCategoryAttributeValueFormRow)
+        : colorAttribute
+          ? []
+          : [{ name: { en: '', ar: '' } }];
+    loadedValuesKey.current = categoryAttributeValuesKey(values, colorAttribute);
+    hydratedAttributeId.current = attribute.id;
+    reset({
+      category_id: categoryId,
+      name: attribute.name,
+      type: attribute.type,
+      values,
+    });
   }, [
     categoryAttributeData,
     isEditMode,
     isLoadingAttribute,
     reset,
     flatItems,
+    formState.isDirty,
   ]);
 
   useEffect(() => {
@@ -188,37 +202,25 @@ export default function CreatePage() {
         return;
       }
 
-      const colorAttribute = isColorCategoryAttribute(data);
-      const valuesTouched = Boolean(formState.dirtyFields.values);
-      // Create with no rows links the full colors palette. Update with untouched
-      // rows keeps the current values. A sent row must include color_id.
+      const live = getValues();
+      const colorAttribute = isColorCategoryAttribute(live);
+      const valuesKey = categoryAttributeValuesKey(live.values, colorAttribute);
+      const valuesChanged = valuesKey !== loadedValuesKey.current;
+      // Create with no rows links the full colors palette. Update sends values
+      // only when a row changed, so an untouched save does not rewrite them.
       const sendValues = colorAttribute
-        ? data.values.length > 0 && (!isEditMode || valuesTouched)
-        : !isEditMode || valuesTouched;
-      if (
-        sendValues &&
-        colorAttribute &&
-        data.values.some((row) => parseCategoryAttributeValueId(row.color_id) == null)
-      ) {
-        data.values.forEach((row, index) => {
-          if (parseCategoryAttributeValueId(row.color_id) != null) return;
-          setError(`values.${index}.color_id`, {
-            type: 'manual',
-            message: t('categoryAttribute.colorIdRequired', { ns: 'validation' }),
-          });
-        });
-        return;
-      }
+        ? live.values.length > 0 && (!isEditMode || valuesChanged)
+        : !isEditMode || valuesChanged;
       const payload = {
-        category_id: data.category_id,
+        category_id: live.category_id,
         name: {
-          en: data.name.en,
-          ar: data.name.ar,
+          en: live.name.en,
+          ar: live.name.ar,
         },
-        type: data.type,
+        type: live.type,
         ...(sendValues
           ? {
-              values: data.values.map((row) =>
+              values: live.values.map((row) =>
                 toCategoryAttributeValuePayload(row, { includeColorId: colorAttribute })
               ),
             }

@@ -1,4 +1,16 @@
-/** Color attribute: `type = color`, or the name is Color / اللون even when type is `square`. */
+/** Same labels the API treats as a color attribute, even when `type` is `square`. */
+const COLOR_ATTRIBUTE_NAMES = new Set([
+  'color',
+  'colour',
+  'اللون',
+  'لون',
+  'الالوان',
+  'الألوان',
+  'الوان',
+  'ألوان',
+]);
+
+/** Color attribute: `type = color`, or a color name even when type is `square`. */
 export function isColorCategoryAttribute(input: {
   type?: string | null;
   name?: { ar?: string; en?: string } | string | null;
@@ -13,7 +25,6 @@ export function isColorCategoryAttribute(input: {
 }
 
 function isColorAttributeName(value: unknown): boolean {
-  const text = String(value ?? '').trim();
-  if (!text) return false;
-  return text.toLowerCase() === 'color' || text === 'اللون';
+  const text = String(value ?? '').trim().toLowerCase();
+  return text !== '' && COLOR_ATTRIBUTE_NAMES.has(text);
 }

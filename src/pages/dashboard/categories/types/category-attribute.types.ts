@@ -75,7 +75,7 @@ export interface CategoryAttributeCreateUpdatePayload {
   values?: Array<{
     /** Required on update for existing values so the backend keeps the same row/id. */
     id?: number;
-    /** Required on every color-attribute row that is sent. `colors.id`, not the value id. */
+    /** `colors.id`, not the value id. Omitted when the row has no shade; that does not clear an existing link. */
     color_id?: number;
     name: {
       en: string;

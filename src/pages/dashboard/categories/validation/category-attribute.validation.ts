@@ -27,7 +27,7 @@ export const CategoryAttributeSchema = zod.object({
   ),
 }).superRefine((data, ctx) => {
   // Empty color values are valid: create links the full palette, and an
-  // untouched edit omits `values`. color_id is checked at submit when rows are sent.
+  // untouched edit omits `values`. color_id is optional when rows are sent.
   if (isColorCategoryAttribute(data)) return;
 
   if (data.values.length < 1) {

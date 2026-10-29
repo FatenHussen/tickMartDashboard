@@ -33,6 +33,19 @@ import {
   extractVariantAttributeValueIds,
 } from '@/pages/dashboard/products/utils/variant-payload';
 import {
+  linkedShadeHex,
+  priceAfterDiscount,
+  attributeValueLabel,
+  buildColorsHexLookup,
+  sanitizeEnglishSkuInput,
+  resolveAttributeValueId,
+  generateRandomVariantSku,
+  mergeVariantAttributeValueIds,
+  toCategoryAttributePickerRows,
+  type CategoryAttributePickerRow,
+  ensureCategoryAttributesFromVariants,
+} from '@/pages/dashboard/products/utils/variant-combinations';
+import {
   ProductDetailsTag,
   ProductDetailsChip,
   ProductDetailsField,
@@ -46,20 +59,6 @@ import {
   ProductDetailsPricingSummary,
   ProductDetailsDualCurrencyInline,
 } from '@/pages/dashboard/products/components/product-details-ui';
-import {
-  priceAfterDiscount,
-  attributeValueLabel,
-  buildColorsHexLookup,
-  sanitizeEnglishSkuInput,
-  resolveAttributeValueId,
-  generateRandomVariantSku,
-  mergeVariantAttributeValueIds,
-  toCategoryAttributePickerRows,
-  variantPointsAtUncoloredShade,
-  type CategoryAttributePickerRow,
-  resolveCategoryAttributeValueHex,
-  ensureCategoryAttributesFromVariants,
-} from '@/pages/dashboard/products/utils/variant-combinations';
 
 import { paths } from 'src/routes/paths';
 
@@ -362,10 +361,6 @@ function EditVariantModal({
       categoryAttributes,
       variant?.attributes
     );
-    if (variantPointsAtUncoloredShade(categoryAttributes, nextAttrIds)) {
-      toast.error(t('form.productColorSaveBlocked'));
-      return;
-    }
     const originalIds = normalizeVariantExistingImages(variant.images).map((img) => img.id);
     const imageFields = variantImageFieldsFromRow({
       images: newImages,
@@ -1305,7 +1300,7 @@ export default function DetailsPage() {
                                     '—';
                                   const isColor = isColorCategoryAttribute(attr);
                                   const hex = isColor
-                                    ? resolveCategoryAttributeValueHex(
+                                    ? linkedShadeHex(
                                         val ?? {
                                           id: selectedId ?? 0,
                                           hex: variantAttr?.hex,
@@ -1332,7 +1327,7 @@ export default function DetailsPage() {
                                     type: attr.type,
                                     name: attr.attribute,
                                   })
-                                    ? resolveCategoryAttributeValueHex(
+                                    ? linkedShadeHex(
                                         {
                                           id: Number(attr.id) || 0,
                                           hex: attr.hex,

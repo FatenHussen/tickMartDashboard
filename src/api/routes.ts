@@ -127,8 +127,6 @@ export const apiRoutes = {
     update: (id: number | string) => `${ROOTS.ADMIN}/category-attributes/${id}`,
     delete: (id: number | string) => `${ROOTS.ADMIN}/category-attributes/${id}`,
     details: (id: number | string) => `${ROOTS.ADMIN}/category-attributes/${id}`,
-    /** Typed shade name + palette hex → `colors` row, linked on this attribute. */
-    paletteShade: (id: number | string) => `${ROOTS.ADMIN}/category-attributes/${id}/palette-shade`,
     /** Preview of what a delete would affect (values/variants/products/orders). */
     deleteImpact: (id: number | string) => `${ROOTS.ADMIN}/category-attributes/${id}/delete-impact`,
     /** Paginated product variants currently using this attribute's values. */
