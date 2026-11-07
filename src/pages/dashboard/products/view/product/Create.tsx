@@ -76,28 +76,11 @@ import { paths } from 'src/routes/paths';
 
 import { CONFIG } from 'src/global-config';
 import { Label } from 'src/shared/components/label';
+import { Box, Tab, Tabs, Button, Typography } from 'src/shared/ui';
 import { CreateFormLayout } from 'src/shared/components/forms/create-form-layout';
 import { RHFInfiniteSelect } from 'src/shared/components/hook-form/rhf-infinite-select';
-import {
-  Box,
-  Tab,
-  Tabs,
-  Button,
-  Select,
-  Typography,
-  SelectItem,
-  SelectValue,
-  SelectContent,
-  SelectTrigger,
-} from 'src/shared/ui';
 
 // ----------------------------------------------------------------------
-
-/** Radix Select cannot use an empty string; marks an unset/clearable option. */
-const DETAIL_NONE_VALUE = '__none__';
-
-const detailSelectTriggerCls =
-  'h-10 w-full rounded-lg border border-border bg-background px-3 text-sm shadow-none';
 
 const brandFetcher = (page: number, limit: number) =>
   _BrandApi.getListBrands({ page, per_page: limit }).then((r) => ({
@@ -1908,9 +1891,6 @@ export default function CreatePage() {
             : undefined,
         seo_image: live.seo_image ?? data.seo_image,
         icon_ids: live.icon_ids ?? data.icon_ids,
-        badges: live.badges ?? data.badges,
-        category_details: live.category_details ?? data.category_details,
-        extra_details: live.extra_details ?? data.extra_details,
         variants: (data.variants ?? []).map((dv, i) => {
           const dvId = (dv as { id?: number }).id;
           const lv =
@@ -3504,49 +3484,27 @@ export default function CreatePage() {
                         control={control}
                         render={({ field: f, fieldState: { error } }) => (
                           <div className="flex-1 min-w-0">
-                            <Select
-                              value={
-                                f.value && Number(f.value) > 0
-                                  ? String(f.value)
-                                  : DETAIL_NONE_VALUE
-                              }
-                              onValueChange={(v) => {
-                                f.onChange(v === DETAIL_NONE_VALUE ? 0 : Number(v));
+                            <select
+                              {...f}
+                              value={f.value}
+                              onChange={(e) => {
+                                f.onChange(Number(e.target.value));
                                 setValue(
                                   `category_details.${index}.detail_value`,
                                   { en: '', ar: '' },
                                   { shouldDirty: true, shouldValidate: true }
                                 );
                               }}
+                              className={fieldInputClass(!!error)}
                             >
-                              <SelectTrigger
-                                className={`${detailSelectTriggerCls}${
-                                  error ? ' border-destructive focus:ring-destructive/40' : ''
-                                }`}
-                              >
-                                <SelectValue placeholder="—" />
-                              </SelectTrigger>
-                              <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
-                                <SelectItem value={DETAIL_NONE_VALUE} textValue="—">
-                                  <span className="text-muted-foreground">—</span>
-                                </SelectItem>
-                                {availableCategoryDetails.map((cd: any) => {
-                                  const label =
-                                    typeof cd.name === 'object'
-                                      ? cd.name?.en ?? cd.name?.ar
-                                      : cd.name;
-                                  return (
-                                    <SelectItem
-                                      key={cd.id}
-                                      value={String(cd.id)}
-                                      textValue={String(label ?? cd.id)}
-                                    >
-                                      {label}
-                                    </SelectItem>
-                                  );
-                                })}
-                              </SelectContent>
-                            </Select>
+                              {availableCategoryDetails.map((cd: any) => (
+                                <option key={cd.id} value={cd.id}>
+                                  {typeof cd.name === 'object'
+                                    ? cd.name?.en ?? cd.name?.ar
+                                    : cd.name}
+                                </option>
+                              ))}
+                            </select>
                             <FieldErrorText message={error?.message} />
                           </div>
                         )}
@@ -3567,10 +3525,12 @@ export default function CreatePage() {
                         <Typography variant="caption" className="text-muted-foreground font-medium block">
                           {t('form.categoryDetailPredefinedValueLabel')}
                         </Typography>
-                        <Select
-                          value={matchedKey || DETAIL_NONE_VALUE}
-                          onValueChange={(v) => {
-                            if (!v || v === DETAIL_NONE_VALUE) {
+                        <select
+                          className={fieldInputClass(false)}
+                          value={matchedKey}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (!v) {
                               setValue(
                                 `category_details.${index}.detail_value`,
                                 { en: '', ar: '' },
@@ -3590,27 +3550,13 @@ export default function CreatePage() {
                             }
                           }}
                         >
-                          <SelectTrigger className={detailSelectTriggerCls}>
-                            <SelectValue placeholder={t('form.selectCategoryDetailValue')} />
-                          </SelectTrigger>
-                          <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
-                            <SelectItem value={DETAIL_NONE_VALUE} textValue="—">
-                              {t('form.selectCategoryDetailValue')}
-                            </SelectItem>
-                            {valueOpts.map((opt, optIdx) => {
-                              const label = `${opt.en} / ${opt.ar}`;
-                              return (
-                                <SelectItem
-                                  key={optIdx}
-                                  value={categoryDetailOptionKey(opt)}
-                                  textValue={label}
-                                >
-                                  {label}
-                                </SelectItem>
-                              );
-                            })}
-                          </SelectContent>
-                        </Select>
+                          <option value="">{t('form.selectCategoryDetailValue')}</option>
+                          {valueOpts.map((opt, optIdx) => (
+                            <option key={optIdx} value={categoryDetailOptionKey(opt)}>
+                              {`${opt.en} / ${opt.ar}`}
+                            </option>
+                          ))}
+                        </select>
                         {hasOrphanSaved ? (
                           <Typography variant="caption" className="text-amber-600 dark:text-amber-500 block">
                             {t('form.categoryDetailValueNotInList', {
@@ -3702,15 +3648,11 @@ export default function CreatePage() {
                         control={control}
                         render={({ field: f, fieldState: { error } }) => (
                           <div>
-                            <Select
-                              value={
-                                f.value && Number(f.value) > 0
-                                  ? String(f.value)
-                                  : DETAIL_NONE_VALUE
-                              }
-                              onValueChange={(v) => {
-                                const nextId =
-                                  !v || v === DETAIL_NONE_VALUE ? 0 : Number(v);
+                            <select
+                              value={f.value ? String(f.value) : ''}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                const nextId = v ? Number(v) : 0;
                                 f.onChange(nextId);
                                 if (nextId > 0) {
                                   const preset = productExtraPresets.find((p) => p.id === nextId);
@@ -3721,39 +3663,20 @@ export default function CreatePage() {
                                   );
                                 }
                               }}
+                              onBlur={f.onBlur}
+                              ref={f.ref}
+                              className={fieldInputClass(!!error)}
                               disabled={
-                                categoryIdNum <= 0 ||
-                                rowOptions.length === 0 ||
-                                !productExtraPresets.length
+                                categoryIdNum <= 0 || rowOptions.length === 0 || !productExtraPresets.length
                               }
                             >
-                              <SelectTrigger
-                                className={`${detailSelectTriggerCls}${
-                                  error ? ' border-destructive focus:ring-destructive/40' : ''
-                                }`}
-                              >
-                                <SelectValue
-                                  placeholder={t('form.productExtraDetailSelectPlaceholder')}
-                                />
-                              </SelectTrigger>
-                              <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
-                                <SelectItem value={DETAIL_NONE_VALUE} textValue="—">
-                                  {t('form.productExtraDetailSelectPlaceholder')}
-                                </SelectItem>
-                                {rowOptions.map((pr) => {
-                                  const label = labelProductExtraPreset(pr);
-                                  return (
-                                    <SelectItem
-                                      key={pr.id}
-                                      value={String(pr.id)}
-                                      textValue={label}
-                                    >
-                                      {label}
-                                    </SelectItem>
-                                  );
-                                })}
-                              </SelectContent>
-                            </Select>
+                              <option value="">{t('form.productExtraDetailSelectPlaceholder')}</option>
+                              {rowOptions.map((pr) => (
+                                <option key={pr.id} value={String(pr.id)}>
+                                  {labelProductExtraPreset(pr)}
+                                </option>
+                              ))}
+                            </select>
                             <FieldErrorText message={error?.message} />
                           </div>
                         )}

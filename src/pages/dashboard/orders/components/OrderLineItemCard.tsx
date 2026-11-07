@@ -106,22 +106,16 @@ export function OrderLineItemCard({
           {item.product_name}
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
-          {t('orders.itemQtyLabel')}:{' '}
-          <span className="tabular-nums text-foreground">{item.quantity}</span>
+          {t('orders.orderItemUnitQty', { unit: itemUnitLabel(item), qty: item.quantity })}
         </p>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          {t('orders.itemUnitPriceLabel')}:{' '}
-          <span className="text-foreground">{itemUnitLabel(item)}</span>
-        </p>
-        {hasDistinctFinalUnit(item) ? (
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {t('orders.itemFinalUnitLabel')}:{' '}
-            <span className="text-foreground">{itemFinalUnitLabel(item)}</span>
-          </p>
-        ) : null}
         <p className="mt-0.5 text-sm font-medium text-foreground">
           {t('orders.itemLineTotalLabel')}: {itemLineTotalLabel(item)}
         </p>
+        {hasDistinctFinalUnit(item) ? (
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t('orders.itemFinalUnitLabel')}: {itemFinalUnitLabel(item)}
+          </p>
+        ) : null}
         {discount > 0 ? (
           <p className="mt-1 text-sm text-muted-foreground">
             {t('orders.itemDiscountLabel')}: −{discount}
