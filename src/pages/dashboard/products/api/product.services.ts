@@ -313,6 +313,9 @@ const buildProductFormData = (data: ProductCreateUpdatePayload): FormData => {
       formData.append(`category_details[${index}][detail_value][en]`, detail.detail_value.en);
       formData.append(`category_details[${index}][detail_value][ar]`, detail.detail_value.ar);
     });
+  } else if (data.id != null) {
+    // Omit on create. On update, empty must be explicit or PUT keeps old rows.
+    formData.append('category_details', '');
   }
 
   const extraRows = (data.extra_details ?? []).filter(
@@ -334,11 +337,18 @@ const buildProductFormData = (data: ProductCreateUpdatePayload): FormData => {
       );
       appendOptionalFiniteNumber(formData, `extra_details[${index}][price]`, detail.price);
     });
+  } else if (data.id != null) {
+    formData.append('extra_details', '');
   }
 
-  (data.badges ?? []).forEach((badgeId) => {
-    formData.append('badges[]', String(badgeId));
-  });
+  const badgeIds = (data.badges ?? [])
+    .map((badgeId) => Number(badgeId))
+    .filter((badgeId) => Number.isFinite(badgeId) && badgeId > 0);
+  if (badgeIds.length > 0) {
+    badgeIds.forEach((badgeId) => formData.append('badges[]', String(badgeId)));
+  } else if (data.id != null) {
+    formData.append('badges', '');
+  }
 
   const iconIds = (data.icon_ids ?? [])
     .map((iconId) => Number(iconId))
