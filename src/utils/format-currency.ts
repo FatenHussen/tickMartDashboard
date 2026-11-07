@@ -59,20 +59,21 @@ export function normalizeFormattedMoneyText(text: string | null | undefined): st
 }
 
 /**
- * Prefer numeric fallback when available; otherwise normalize API formatted strings.
+ * Prefer API formatted money strings; fall back to currency-formatted numbers
+ * so a bare amount is not mistaken for quantity in RTL layouts.
  */
 export function formatMoneyLine(
   formatted: string | null | undefined,
   fallback: unknown,
   options: FormatMoneyLineOptions = {}
 ): string {
-  const numeric = parseNumeric(fallback as number | string | null | undefined);
-  if (numeric !== null) {
-    return formatDecimal(numeric, options);
-  }
-
   if (formatted != null && String(formatted).trim() !== '') {
     return normalizeFormattedMoneyText(String(formatted));
+  }
+
+  const numeric = parseNumeric(fallback as number | string | null | undefined);
+  if (numeric !== null) {
+    return formatCurrency(numeric, { decimals: options.maxDecimals ?? 2 });
   }
 
   return '—';
