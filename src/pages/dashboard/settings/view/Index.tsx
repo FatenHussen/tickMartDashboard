@@ -20,17 +20,22 @@ import {
   QuickOrderSettingsPanel,
   QUICK_ORDER_SETTING_KEYS,
 } from '@/pages/dashboard/settings/components/QuickOrderSettingsPanel';
+import {
+  LocalizationDefaultsPanel,
+  LOCALIZATION_SETTING_KEYS,
+} from '@/pages/dashboard/settings/components/LocalizationDefaultsPanel';
 
 import { CONFIG } from 'src/global-config';
 import { Button } from 'src/shared/ui/button';
 import { Box, Typography } from 'src/shared/ui';
 import { LoadingScreen } from 'src/shared/components/loading-screen';
 
-type SettingsTab = 'general' | 'quick_order' | 'delivery';
+type SettingsTab = 'general' | 'quick_order' | 'delivery' | 'localization';
 
 function parseSettingsTab(raw: string | null): SettingsTab {
   if (raw === 'quick_order') return 'quick_order';
   if (raw === 'delivery') return 'delivery';
+  if (raw === 'localization') return 'localization';
   return 'general';
 }
 
@@ -64,6 +69,10 @@ function isQuickOrderKey(key: string): boolean {
 
 function isDeliverySettingKey(key: string): boolean {
   return (DELIVERY_SETTING_KEYS as readonly string[]).includes(key);
+}
+
+function isLocalizationSettingKey(key: string): boolean {
+  return (LOCALIZATION_SETTING_KEYS as readonly string[]).includes(key);
 }
 
 function SettingRow({
@@ -187,11 +196,19 @@ export default function Page() {
 
   const items = settingsItemsFromListData(data?.data);
   const generalItems = items.filter(
-    (item) => !isQuickOrderKey(item.key) && !isDeliverySettingKey(item.key)
+    (item) =>
+      !isQuickOrderKey(item.key) &&
+      !isDeliverySettingKey(item.key) &&
+      !isLocalizationSettingKey(item.key)
   );
 
   const tabs: Array<{ id: SettingsTab; label: string; icon: string }> = [
     { id: 'general', label: t('form.settingsTabGeneral'), icon: 'solar:settings-minimalistic-bold' },
+    {
+      id: 'localization',
+      label: t('form.settingsTabLocalization'),
+      icon: 'solar:global-bold',
+    },
     { id: 'delivery', label: t('form.settingsTabDelivery'), icon: 'solar:delivery-bold' },
     { id: 'quick_order', label: t('form.settingsTabQuickOrder'), icon: 'solar:bolt-bold' },
   ];
@@ -233,7 +250,9 @@ export default function Page() {
           })}
         </Box>
 
-        {tab === 'delivery' ? (
+        {tab === 'localization' ? (
+          <LocalizationDefaultsPanel />
+        ) : tab === 'delivery' ? (
           <Box className="space-y-10">
             <DeliverySettingsPanel />
             <Box className="border-t border-border/60 pt-8">

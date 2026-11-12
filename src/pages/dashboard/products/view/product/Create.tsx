@@ -34,9 +34,9 @@ import { TinyMCEEditorField } from '@/shared/components/tinymce-editor/tinymce-e
 import { useUpdateProductVariant } from '@/pages/dashboard/products/hooks/product-variant';
 import { _SaleCountryApi } from '@/pages/dashboard/sale-countries/api/sale-country.services';
 import { useVariantDeleteFlow } from '@/pages/dashboard/products/hooks/use-variant-delete-flow';
+import { ProductDetailSelect } from '@/pages/dashboard/products/components/ProductDetailSelect';
 import { ProductFormExtrasTab } from '@/pages/dashboard/products/components/ProductFormExtrasTab';
 import { ProductPricingFields } from '@/pages/dashboard/products/components/ProductPricingFields';
-import { ProductDetailSelect } from '@/pages/dashboard/products/components/ProductDetailSelect';
 import { useFetchCategoryAttributes } from '@/pages/dashboard/categories/hooks/category-attribute';
 import { parseOptionalDiscount } from '@/pages/dashboard/products/components/variant-field-helpers';
 import { useFetchProductExtraDetails } from '@/pages/dashboard/categories/hooks/product-extra-detail';
