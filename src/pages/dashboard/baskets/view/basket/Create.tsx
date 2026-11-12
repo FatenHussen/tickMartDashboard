@@ -721,6 +721,7 @@ export default function CreatePage() {
                       );
                     }}
                   />
+                  <FieldErrorText message={errors.items?.[index]?.shop_product_variant_id?.message} />
                 </Box>
                 <Box className="w-24 shrink-0">
                   <RHFTextField name={`items.${index}.quantity`} placeholder={t('form.quantity')} type="number" fullWidth />

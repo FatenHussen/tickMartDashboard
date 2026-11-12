@@ -284,7 +284,8 @@ export function ScheduledBasketItemCard({
           <Controller
             name={`items.${index}.shop_product_variant_id`}
             control={control}
-            render={({ field: f }) => (
+            render={({ field: f, fieldState: { error } }) => (
+              <>
               <InfiniteScrollSelect
                 value={Number(f.value) || 0}
                 onChange={(variantId) => f.onChange(Number(variantId) || 0)}
@@ -299,6 +300,12 @@ export function ScheduledBasketItemCard({
                 serverSearch
                 pageSize={50}
               />
+              {error?.message && (
+                <Typography variant="caption" className="text-destructive mt-1 block" role="alert">
+                  {error.message}
+                </Typography>
+              )}
+              </>
             )}
           />
         </Box>

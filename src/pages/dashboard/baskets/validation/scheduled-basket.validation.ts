@@ -34,9 +34,9 @@ export const ScheduledBasketSchema = z
     items: z
       .array(
         z.object({
-          shop_product_variant_id: z.coerce.number().min(1, t('scheduledBasket.productVariantRequired')),
-          shop_product_variant_ids: z.array(z.coerce.number()).optional().default([]),
-          quantity: z.coerce.number().min(1, t('scheduledBasket.quantityMin')),
+          shop_product_variant_id: z.coerce.number().int(t('scheduledBasket.productVariantRequired')).min(1, t('scheduledBasket.productVariantRequired')),
+          shop_product_variant_ids: z.array(z.coerce.number().int().positive()).optional().default([]),
+          quantity: z.coerce.number().int(t('scheduledBasket.quantityMin')).min(1, t('scheduledBasket.quantityMin')),
           is_required: z.boolean().default(false),
           is_extra: z.boolean().default(false),
           min_quantity: z.preprocess(
@@ -54,22 +54,23 @@ export const ScheduledBasketSchema = z
     badges: z.array(z.number()).default([]),
   })
   .superRefine((data, ctx) => {
-    if (!data.has_custom_discount) return;
-    if (data.discount == null) {
+    if (data.has_custom_discount && data.discount == null) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: t('scheduledBasket.customDiscountRequired'),
         path: ['discount'],
       });
     }
-    if (!data.discount_type) {
+    if (data.has_custom_discount && !data.discount_type) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: t('scheduledBasket.customDiscountRequired'),
         path: ['discount_type'],
       });
     }
-    issueIfPercentageDiscountOver100(ctx, data.discount_type, data.discount, ['discount']);
+    if (data.has_custom_discount) {
+      issueIfPercentageDiscountOver100(ctx, data.discount_type, data.discount, ['discount']);
+    }
     data.items.forEach((item, index) => {
       if (item.min_quantity != null && item.max_quantity != null && item.max_quantity < item.min_quantity) {
         ctx.addIssue({

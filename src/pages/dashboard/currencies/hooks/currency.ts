@@ -26,7 +26,8 @@ export const useCreateCurrency = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: CurrencyCreateUpdatePayload) => _CurrencyApi.createCurrency(data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['currency', 'list'] }); },
+    // A new default can change any existing currency's default status.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['currency'] }),
   });
 };
 
@@ -35,10 +36,7 @@ export const useUpdateCurrency = () => {
   return useMutation({
     mutationFn: ({ id, data }: { id: number | string; data: CurrencyCreateUpdatePayload }) =>
       _CurrencyApi.updateCurrency(id, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['currency', 'list'] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.currency.details(variables.id) });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['currency'] }),
   });
 };
 
@@ -46,7 +44,7 @@ export const useDeleteCurrency = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: number | string) => _CurrencyApi.deleteCurrency(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['currency', 'list'] }); },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['currency'] }),
   });
 };
 
@@ -54,6 +52,6 @@ export const useToggleCurrencyStatus = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: number | string) => _CurrencyApi.toggleStatus(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['currency', 'list'] }); },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['currency'] }),
   });
 };

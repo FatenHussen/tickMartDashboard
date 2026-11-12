@@ -192,7 +192,7 @@ export const _ShopProductVariantApi = {
           };
           return { ...row, label: formatShopProductVariantListLabel(row, includePricing) };
         })
-        .filter((i: ShopProductVariantItem) => Number.isFinite(i.id) && i.id > 0);
+        .filter((i: ShopProductVariantItem) => Number.isSafeInteger(i.id) && i.id > 0);
       return {
         status: data.status ?? true,
         message: data.message ?? '',

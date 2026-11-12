@@ -50,7 +50,7 @@ export type ProductVariantInlineRowProps = {
   restaurantMode: boolean;
   isEditMode: boolean;
   productId?: string;
-  productResponse?: { variants?: Array<{ id: number; images?: Array<{ id: number; url: string }> }> };
+  productResponse?: { variants?: Array<{ id: number }> };
   onRemove: () => void;
   onSave: () => void | Promise<void>;
   isSaving: boolean;

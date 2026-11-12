@@ -171,7 +171,9 @@ export interface ProductDetailData {
       cost_price?: number | null;
       cost_price_currencies?: Record<string, ProductDetailCurrencyAmount> | null;
     }>;
-    images: Array<{ id: number; url: string; path?: string }>;
+    /** False means `images` is inherited product media and must not be edited as variant-owned media. */
+    has_variant_images?: boolean;
+    images: Array<{ id: number | null; url?: string | null; path?: string | null }>;
   }>;
   category_details: Array<{
     id: number;

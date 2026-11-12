@@ -44,7 +44,6 @@ export type ProductVariantsCardListProps = {
   productResponse?: {
     variants?: Array<{
       id: number;
-      images?: Array<{ id: number; url: string }>;
       attributes?: VariantAttributeRow[];
     }>;
   };

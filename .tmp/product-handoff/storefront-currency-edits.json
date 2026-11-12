@@ -1,0 +1,35 @@
+{
+  "sourceRoot": "C:/Users/FATEN/Desktop/tikmool-website",
+  "edits": [
+    {
+      "path": "src/features/account/types/index.ts",
+      "old": "export interface MyCurrencyData {\n id: number;\n code: string;\n name: string;\n symbol: string;\n exchange_rate: string;\n is_default: boolean;\n is_active: boolean;\n}",
+      "new": "export interface MyCurrencyData {\n id: number;\n code: string;\n name: string;\n symbol: string;\n exchange_rate: string;\n is_default: boolean;\n is_active: boolean;\n /** Missing provenance from older APIs does not establish a saved preference. */\n preference_source?: \"user\" | \"default\" | null;\n}"
+    },
+    {
+      "path": "src/shared/lib/currencyPreference.ts",
+      "old": "/** Account preferences only belong to the authenticated account that supplied them. */",
+      "new": "/** Only an active account currency explicitly saved by the customer has account precedence. */\nexport function getExplicitAccountCurrency(\n    currency: (CurrencyValue & { preference_source?: string | null; is_active?: boolean }) | null | undefined,\n): CurrencyValue | null {\n    if (currency?.preference_source !== \"user\" || currency.is_active !== true) return null;\n    return { code: currency.code, symbol: currency.symbol };\n}\n\n/** Account preferences only belong to the authenticated account that supplied them. */"
+    },
+    {
+      "path": "src/features/account/components/CurrencyFromApiSync.tsx",
+      "old": "import { useAuthStore } from \"@/store/auth\";\n",
+      "new": "import { useAuthStore } from \"@/store/auth\";\nimport { getExplicitAccountCurrency } from \"@/shared/lib/currencyPreference\";\n"
+    },
+    {
+      "path": "src/features/account/components/CurrencyFromApiSync.tsx",
+      "old": "        if (authenticated && myCurrency) {\n            setCurrency(myCurrency.code, myCurrency.symbol, { fromAccount: true });\n        }\n    }, [authenticated, userId, myCurrency, setCurrency]);",
+      "new": "        if (authenticated && myCurrency) {\n            const preference = getExplicitAccountCurrency(myCurrency);\n            if (preference) {\n                setCurrency(preference.code, preference.symbol, { fromAccount: true });\n            } else {\n                // An inherited default must also clear a previously applied account choice.\n                resetAccountCurrency();\n            }\n        }\n    }, [authenticated, userId, myCurrency, setCurrency, resetAccountCurrency]);"
+    },
+    {
+      "path": "tests/currency.test.mjs",
+      "old": "    CURRENCY_PREFERENCE_KEY,\n",
+      "new": "    CURRENCY_PREFERENCE_KEY,\n    getExplicitAccountCurrency,\n"
+    },
+    {
+      "path": "tests/currency.test.mjs",
+      "old": "test(\"malformed cache or denied storage still allows a safe default and currency switching\", () => {",
+      "new": "test(\"an inherited account currency cannot override the current dashboard default\", () => {\n    const inherited = { code: \"SYP\", symbol: \"ل.س\", is_active: true, preference_source: \"default\" };\n    assert.equal(getExplicitAccountCurrency(inherited), null);\n    assert.deepEqual(resetAccountCurrencySelection(usdDefault, usdDefault), usdDefault);\n});\n\ntest(\"only an active explicit account choice receives account precedence\", () => {\n    const saved = { code: \"EUR\", symbol: \"€\", is_active: true, preference_source: \"user\" };\n    const preference = getExplicitAccountCurrency(saved);\n    assert.deepEqual(preference, { code: \"EUR\", symbol: \"€\" });\n    const account = { ...preference, source: \"account\" };\n    assert.deepEqual(resolveCurrencySelection(usdDefault, account), account);\n    assert.deepEqual(resolveCurrencySelection(account, usdDefault), account);\n    assert.deepEqual(resolveCurrencySelection(sypUser, account), sypUser);\n});\n\ntest(\"legacy unknown and inactive account responses do not establish an explicit preference\", () => {\n    const legacy = { code: \"SYP\", symbol: \"ل.س\", is_active: true };\n    for (const response of [\n        undefined,\n        null,\n        legacy,\n        { ...legacy, preference_source: null },\n        { ...legacy, preference_source: \"unknown\" },\n        { ...legacy, preference_source: \"user\", is_active: false },\n        { code: \"SYP\", symbol: \"ل.س\", preference_source: \"user\" },\n    ]) assert.equal(getExplicitAccountCurrency(response), null);\n});\n\ntest(\"a default-origin response clears prior account precedence and follows later dashboard changes\", () => {\n    const previousAccount = { code: \"EUR\", symbol: \"€\", source: \"account\" };\n    const inherited = { code: \"SYP\", symbol: \"ل.س\", is_active: true, preference_source: \"default\" };\n    assert.equal(getExplicitAccountCurrency(inherited), null);\n    const resumedDefault = resetAccountCurrencySelection(previousAccount, usdDefault);\n    assert.deepEqual(resumedDefault, usdDefault);\n    const nextDefault = { code: \"SAR\", symbol: \"ر.س\", source: \"default\" };\n    assert.deepEqual(resolveCurrencySelection(resumedDefault, nextDefault), nextDefault);\n});\n\ntest(\"clearing inherited account state preserves explicit browser choices across reload\", () => {\n    const storage = createStorage();\n    persistCurrencySelection(storage, sypUser);\n    const restored = readCurrencySelection(storage);\n    const inherited = { code: \"USD\", symbol: \"$\", is_active: true, preference_source: \"default\" };\n    assert.equal(getExplicitAccountCurrency(inherited), null);\n    const selection = resetAccountCurrencySelection(restored, usdDefault);\n    assert.deepEqual(selection, sypUser);\n    persistCurrencySelection(storage, selection);\n    assert.deepEqual(readCurrencySelection(storage), sypUser);\n});\n\ntest(\"malformed cache or denied storage still allows a safe default and currency switching\", () => {"
+    }
+  ]
+}

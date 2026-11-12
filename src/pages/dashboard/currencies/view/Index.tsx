@@ -29,9 +29,13 @@ export default function Page() {
 
   if (error) console.error('Error fetching currencies:', error);
 
-  const onDelete = (id: number) => setDeletingId(id);
+  const onDelete = (id: number) => {
+    if (response?.data.items.some((currency) => currency.id === id && currency.is_default)) return;
+    setDeletingId(id);
+  };
   const onDeleteConfirm = async () => {
     if (deletingId) {
+      if (response?.data.items.some((currency) => currency.id === deletingId && currency.is_default)) return;
       try {
         await deleteMutation.mutateAsync(deletingId);
         toast.success(t('deleteSuccess'));
@@ -48,7 +52,7 @@ export default function Page() {
   const apiPagination = response?.data?.pagination;
   const pagination = apiPagination
     ? { current_page: apiPagination.current_page, last_page: apiPagination.last_page, per_page: apiPagination.per_page, total: apiPagination.total, from: (apiPagination.current_page - 1) * apiPagination.per_page + 1, to: Math.min(apiPagination.current_page * apiPagination.per_page, apiPagination.total) }
-    : { current_page: 1, last_page: 1, per_page: 10, total: 0, from: 0, to: 0 };
+    : { current_page: 1, last_page: 1, per_page: items.length || pageSize, total: items.length, from: items.length ? 1 : 0, to: items.length };
 
   const { can } = usePermissions();
   const hasPermission = (action: string, resource: string) => can(`${resource}.${action}`);

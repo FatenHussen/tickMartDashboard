@@ -130,29 +130,38 @@ function sameIdSet(a: number[], b: number[]): boolean {
   return left.every((id, i) => id === right[i]);
 }
 
-/** Admin GET uses `url`; user GET uses `path`. Either is a full URL (or storage path). */
-export function normalizeVariantExistingImages(raw: unknown): VariantExistingImage[] {
-  if (!Array.isArray(raw)) return [];
+/**
+ * Admin GET uses `url`; user GET uses `path`. Only variant-owned media can be
+ * retained or removed here. Omitted ownership flags preserve legacy API support.
+ */
+export function normalizeVariantExistingImages(
+  raw: unknown,
+  hasVariantImages?: boolean
+): VariantExistingImage[] {
+  if (hasVariantImages === false || !Array.isArray(raw)) return [];
   const out: VariantExistingImage[] = [];
+  const seen = new Set<number>();
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue;
     const rec = item as Record<string, unknown>;
     const id = Number(rec.id);
-    if (!Number.isFinite(id) || id <= 0) continue;
-    const rawUrl = rec.url ?? rec.path;
-    const url = resolveStorageImageUrl(typeof rawUrl === 'string' ? rawUrl : null);
+    if (!Number.isInteger(id) || id <= 0 || seen.has(id)) continue;
+    const url =
+      resolveStorageImageUrl(typeof rec.url === 'string' ? rec.url : null) ??
+      resolveStorageImageUrl(typeof rec.path === 'string' ? rec.path : null);
     if (!url) continue;
+    seen.add(id);
     out.push({ id, url });
   }
   return out;
 }
 
-export function variantExistingImageFormState(images: unknown): {
+export function variantExistingImageFormState(images: unknown, hasVariantImages?: boolean): {
   existing_images: VariantExistingImage[];
   existing_images_ids: number[];
   original_existing_images_ids: number[];
 } {
-  const existing_images = normalizeVariantExistingImages(images);
+  const existing_images = normalizeVariantExistingImages(images, hasVariantImages);
   const existing_images_ids = existing_images.map((img) => img.id);
   return {
     existing_images,

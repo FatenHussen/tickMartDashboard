@@ -22,6 +22,8 @@ export interface CurrencyFormValues extends CurrencyData {
   [key: string]: any;
 }
 
+const currencyToggleColumn = createToggleColumn<CurrencyFormValues>({ entityType: 'currency' });
+
 export const currencyColumns = (
   permissions: { update: boolean; delete: boolean },
   t: TFunction<'table'>,
@@ -81,7 +83,22 @@ export const currencyColumns = (
     ),
   },
   ...(permissions.update
-    ? [createToggleColumn<CurrencyFormValues>({ entityType: 'currency' })]
+    ? [{
+        ...currencyToggleColumn,
+        cell: (context) => context.row.original.is_default && context.row.original.is_active ? (
+          <button
+            type="button"
+            role="switch"
+            aria-checked="true"
+            aria-label={t('form.currencyDefaultHelp')}
+            title={t('form.currencyDefaultHelp')}
+            disabled
+            className="relative h-7 w-12 cursor-not-allowed rounded-full border border-border/40 bg-primary opacity-50"
+          >
+            <span className="pointer-events-none absolute end-0.5 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-white shadow-md" />
+          </button>
+        ) : typeof currencyToggleColumn.cell === 'function' ? currencyToggleColumn.cell(context) : null,
+      } satisfies ColumnDef<CurrencyFormValues>]
     : []),
   {
     id: 'actions',
@@ -97,7 +114,7 @@ export const currencyColumns = (
         onDeleteConfirm={onDeleteConfirm}
         onDeleteCancel={onDeleteCancel}
         deletingId={deletingId}
-        permissions={permissions}
+        permissions={{ ...permissions, delete: permissions.delete && !row.original.is_default }}
       />
     ),
   },

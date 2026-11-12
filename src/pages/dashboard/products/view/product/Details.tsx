@@ -344,12 +344,14 @@ function EditVariantModal({
     }
   }, [open, variant, dualPriceReady, sypRate]);
 
-  const existingImages = normalizeVariantExistingImages(variant?.images);
+  const existingImages = normalizeVariantExistingImages(variant?.images, variant?.has_variant_images);
   const [keptImageIds, setKeptImageIds] = useState<number[]>([]);
 
   useEffect(() => {
     if (open && variant) {
-      setKeptImageIds(normalizeVariantExistingImages(variant.images).map((img) => img.id));
+      setKeptImageIds(
+        normalizeVariantExistingImages(variant.images, variant.has_variant_images).map((img) => img.id)
+      );
     }
   }, [open, variant]);
 
@@ -361,7 +363,10 @@ function EditVariantModal({
       categoryAttributes,
       variant?.attributes
     );
-    const originalIds = normalizeVariantExistingImages(variant.images).map((img) => img.id);
+    const originalIds = normalizeVariantExistingImages(
+      variant.images,
+      variant.has_variant_images
+    ).map((img) => img.id);
     const imageFields = variantImageFieldsFromRow({
       images: newImages,
       existing_images_ids: keptImageIds,
@@ -1349,13 +1354,13 @@ export default function DetailsPage() {
                         </Box>
                       )}
 
-                      {normalizeVariantExistingImages(variant.images).length > 0 && (
+                      {normalizeVariantExistingImages(variant.images, variant.has_variant_images).length > 0 && (
                         <Box>
                           <Typography variant="caption" className="mb-2 block text-muted-foreground">
                             {t('form.productDetailsVariantImages')}
                           </Typography>
                           <Box className="flex max-w-full gap-2 overflow-x-auto pb-1 [scrollbar-width:thin]">
-                            {normalizeVariantExistingImages(variant.images).map((img) => (
+                            {normalizeVariantExistingImages(variant.images, variant.has_variant_images).map((img) => (
                               <a
                                 key={img.id}
                                 href={img.url}

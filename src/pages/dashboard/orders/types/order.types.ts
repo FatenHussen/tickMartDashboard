@@ -331,10 +331,41 @@ export interface OrderDetailItemExtra {
   [key: string]: unknown;
 }
 
+/** Store (shop / vendor) a line item is fulfilled from. */
+export interface OrderDetailItemShop {
+  id?: number | null;
+  name?: string | null;
+  [key: string]: unknown;
+}
+
 export interface OrderDetailItem {
   id: number;
   product_name: string;
   product_image?: string | null;
+  /** Product behind the line — used to link to the product details page. */
+  product_id?: number | null;
+  /** Variant actually ordered, when the product has variants. */
+  product_variant_id?: number | null;
+  variant_id?: number | null;
+  /** Variant SKU when present, otherwise the product SKU. */
+  sku?: string | null;
+  product_sku?: string | null;
+  variant_sku?: string | null;
+  /** Manufacturer model number, when the API supplies one. */
+  model_number?: string | null;
+  product_model_number?: string | null;
+  variant_model_number?: string | null;
+  /** Sellable stock left for the ordered variant / product. */
+  available_quantity?: number | null;
+  stock?: number | null;
+  variant_quantity?: number | null;
+  product_quantity?: number | null;
+  /** Store selling the line. May arrive nested or flattened. */
+  shop?: OrderDetailItemShop | null;
+  shop_id?: number | null;
+  shop_name?: string | null;
+  vendor_name?: string | null;
+  store_name?: string | null;
   note?: string | null;
   quantity: number;
   /** Legacy list/detail field; detail API may use `unit_price` / `final_price` instead. */

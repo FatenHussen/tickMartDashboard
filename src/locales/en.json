@@ -2126,10 +2126,11 @@
       "addDetail": "Add Detail",
       "selectCategoryFirstDetails": "Select a category first to load product details.",
       "noCategoryDetailsForCategory": "No product details defined for this category.",
+      "selectCategoryDetail": "Select a detail",
       "selectCategoryDetailValue": "Select a value",
       "categoryDetailPredefinedValueLabel": "Predefined value",
       "noPredefinedDetailValues": "This detail has no predefined options yet. Add them under Product details in the admin, then choose a value here.",
-      "categoryDetailValueNotInList": "Saved value (EN: \"{{en}}\", AR: \"{{ar}}\") is not in the current list. Pick a predefined option.",
+      "categoryDetailValueNotInList": "Saved value (\"{{value}}\") is not in the current list. Pick a predefined option.",
       "categoryDetailValueOptionsTitle": "Predefined values",
       "categoryDetailValueOptionsDesc": "Each option has English and Arabic text. Products using this detail will pick from this list when available.",
       "categoryDetailValueOptionsEmptyAdmin": "No preset values yet. Use \"Add option\" to create bilingual choices.",
@@ -3111,6 +3112,7 @@
       "currencyExchangeRateLabel": "Exchange rate",
       "placeholderExchange1": "1",
       "defaultCurrencyLabel": "Default currency",
+      "currencyDefaultHelp": "Select another active currency as the default before deleting or deactivating the current default.",
       "currencyCreateDocumentTitle": "{{appName}} — Create currency",
       "currencyEditDocumentTitle": "{{appName}} — Edit currency",
       "createCurrencySubmit": "Create currency",
@@ -4640,7 +4642,12 @@
       "itemLineTotalLabel": "Line total",
       "itemDeliveryWindow": "Delivery window",
       "itemCustomerNote": "Customer note",
-      "itemSpecifications": "Selected options"
+      "itemSpecifications": "Selected options",
+      "itemShop": "Store",
+      "itemProductNumber": "Product number",
+      "itemSku": "SKU",
+      "itemModelNumber": "Model number",
+      "itemAvailableQty": "Available quantity"
     },
     "tableNames": {
       "activityLog": "Activity Log",
@@ -5176,11 +5183,12 @@
       "generalScopeExclusive": "\"General\" cannot be combined with other scopes"
     },
     "currency": {
-      "codeLength": "Code must be exactly 3 characters",
+      "codeLength": "Code must contain exactly 3 English letters",
       "nameEnRequired": "English name is required",
       "nameArRequired": "Arabic name is required",
       "symbolRequired": "Symbol is required",
-      "exchangeRateMin": "Exchange rate must be greater than 0"
+      "exchangeRateMin": "Exchange rate must be a finite number greater than 0",
+      "defaultMustBeActive": "The default currency must be active"
     },
     "driver": {
       "nameRequired": "Name is required",

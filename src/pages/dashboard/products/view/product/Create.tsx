@@ -36,6 +36,7 @@ import { _SaleCountryApi } from '@/pages/dashboard/sale-countries/api/sale-count
 import { useVariantDeleteFlow } from '@/pages/dashboard/products/hooks/use-variant-delete-flow';
 import { ProductFormExtrasTab } from '@/pages/dashboard/products/components/ProductFormExtrasTab';
 import { ProductPricingFields } from '@/pages/dashboard/products/components/ProductPricingFields';
+import { ProductDetailSelect } from '@/pages/dashboard/products/components/ProductDetailSelect';
 import { useFetchCategoryAttributes } from '@/pages/dashboard/categories/hooks/category-attribute';
 import { parseOptionalDiscount } from '@/pages/dashboard/products/components/variant-field-helpers';
 import { useFetchProductExtraDetails } from '@/pages/dashboard/categories/hooks/product-extra-detail';
@@ -461,7 +462,7 @@ function resolveVariantExistingImageIds(
   if (isEditMode && variantId != null && product?.variants?.length) {
     const apiV = product.variants.find((x) => Number(x.id) === Number(variantId));
     if (apiV?.images?.length) {
-      return apiV.images.map((img) => Number(img.id)).filter((x) => !Number.isNaN(x));
+      return variantExistingImageFormState(apiV.images, apiV.has_variant_images).existing_images_ids;
     }
   }
   return [];
@@ -1571,7 +1572,7 @@ export default function CreatePage() {
         seo_image: undefined,
         variants:
           p.variants?.map((v) => {
-            const imageState = variantExistingImageFormState(v.images);
+            const imageState = variantExistingImageFormState(v.images, v.has_variant_images);
             return {
             id: v.id,
             attributes_values_ids: extractVariantAttributeValueIds(v),
@@ -1797,7 +1798,7 @@ export default function CreatePage() {
       const prevFiles = Array.isArray(prev?.images)
         ? (prev!.images as unknown[]).filter((f): f is File => f instanceof File)
         : [];
-      const fromApiImages = variantExistingImageFormState(v.images);
+      const fromApiImages = variantExistingImageFormState(v.images, v.has_variant_images);
       const prevIds =
         prev && Array.isArray(prev.existing_images_ids)
           ? prev.existing_images_ids
@@ -2279,7 +2280,7 @@ export default function CreatePage() {
       try {
         const product = await _ProductApi.getProductById(id);
         const saved = product.variants?.find((x) => Number(x.id) === Number(variantId));
-        const state = variantExistingImageFormState(saved?.images);
+        const state = variantExistingImageFormState(saved?.images, saved?.has_variant_images);
         setValue(`variants.${variantIndex}.existing_images`, state.existing_images, {
           shouldDirty: false,
         });
@@ -3484,27 +3485,27 @@ export default function CreatePage() {
                         control={control}
                         render={({ field: f, fieldState: { error } }) => (
                           <div className="flex-1 min-w-0">
-                            <select
-                              {...f}
-                              value={f.value}
-                              onChange={(e) => {
-                                f.onChange(Number(e.target.value));
+                            <ProductDetailSelect
+                              ref={f.ref}
+                              inputId={`product-detail-${field.id}`}
+                              name={f.name}
+                              onBlur={f.onBlur}
+                              value={String(f.value ?? '')}
+                              placeholder={t('form.selectCategoryDetail')}
+                              error={!!error}
+                              options={availableCategoryDetails.map((cd: any) => ({
+                                value: String(cd.id),
+                                label: formatTranslated(cd.name),
+                              }))}
+                              onChange={(value) => {
+                                f.onChange(Number(value));
                                 setValue(
                                   `category_details.${index}.detail_value`,
                                   { en: '', ar: '' },
                                   { shouldDirty: true, shouldValidate: true }
                                 );
                               }}
-                              className={fieldInputClass(!!error)}
-                            >
-                              {availableCategoryDetails.map((cd: any) => (
-                                <option key={cd.id} value={cd.id}>
-                                  {typeof cd.name === 'object'
-                                    ? cd.name?.en ?? cd.name?.ar
-                                    : cd.name}
-                                </option>
-                              ))}
-                            </select>
+                            />
                             <FieldErrorText message={error?.message} />
                           </div>
                         )}
@@ -3522,46 +3523,36 @@ export default function CreatePage() {
 
                     {hasPresets ? (
                       <Box className="space-y-2">
-                        <Typography variant="caption" className="text-muted-foreground font-medium block">
-                          {t('form.categoryDetailPredefinedValueLabel')}
-                        </Typography>
-                        <select
-                          className={fieldInputClass(false)}
-                          value={matchedKey}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            if (!v) {
-                              setValue(
-                                `category_details.${index}.detail_value`,
-                                { en: '', ar: '' },
-                                { shouldDirty: true, shouldValidate: true }
-                              );
-                              return;
-                            }
-                            try {
-                              const parsed = JSON.parse(v) as { en?: string; ar?: string };
-                              setValue(
-                                `category_details.${index}.detail_value`,
-                                { en: parsed.en ?? '', ar: parsed.ar ?? '' },
-                                { shouldDirty: true, shouldValidate: true }
-                              );
-                            } catch {
-                              /* ignore malformed */
-                            }
-                          }}
+                        <label
+                          htmlFor={`product-detail-value-${field.id}`}
+                          className="text-xs text-muted-foreground font-medium block"
                         >
-                          <option value="">{t('form.selectCategoryDetailValue')}</option>
-                          {valueOpts.map((opt, optIdx) => (
-                            <option key={optIdx} value={categoryDetailOptionKey(opt)}>
-                              {`${opt.en} / ${opt.ar}`}
-                            </option>
-                          ))}
-                        </select>
+                          {t('form.categoryDetailPredefinedValueLabel')}
+                        </label>
+                        <ProductDetailSelect
+                          inputId={`product-detail-value-${field.id}`}
+                          placeholder={t('form.selectCategoryDetailValue')}
+                          value={matchedKey}
+                          isClearable
+                          options={valueOpts.map((opt) => ({
+                            value: categoryDetailOptionKey(opt),
+                            label: formatTranslated(opt),
+                          }))}
+                          onChange={(value) => {
+                            const option = valueOpts.find(
+                              (opt) => categoryDetailOptionKey(opt) === value
+                            );
+                            setValue(
+                              `category_details.${index}.detail_value`,
+                              option ? { en: option.en, ar: option.ar } : { en: '', ar: '' },
+                              { shouldDirty: true, shouldValidate: true }
+                            );
+                          }}
+                        />
                         {hasOrphanSaved ? (
                           <Typography variant="caption" className="text-amber-600 dark:text-amber-500 block">
                             {t('form.categoryDetailValueNotInList', {
-                              en: dv.en ?? '',
-                              ar: dv.ar ?? '',
+                              value: formatTranslated(dv, ''),
                             })}
                           </Typography>
                         ) : null}

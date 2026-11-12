@@ -30,8 +30,8 @@ export const BasketSchema = z
     items: z
       .array(
         z.object({
-          shop_product_variant_id: z.coerce.number().min(1, t('basket.productVariantRequired')),
-          quantity: z.coerce.number().min(1, t('basket.quantityMin')),
+          shop_product_variant_id: z.coerce.number().int(t('basket.productVariantRequired')).min(1, t('basket.productVariantRequired')),
+          quantity: z.coerce.number().int(t('basket.quantityMin')).min(1, t('basket.quantityMin')),
         })
       )
       .min(1, t('basket.atLeastOneItem')),

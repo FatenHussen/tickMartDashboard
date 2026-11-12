@@ -46,22 +46,24 @@ export default function CreatePage() {
     defaultValues,
   });
 
-  const { handleSubmit, reset, control } = methods;
+  const { handleSubmit, reset, control, watch, setValue } = methods;
+  const source = isEditMode ? (detailsResponse?.data ?? fromState) : null;
+  const isCurrentDefault = source?.is_default === true;
+  const isDefault = watch('is_default');
 
   useEffect(() => {
-    const source = isEditMode ? (detailsResponse?.data ?? fromState) : null;
     if (source) {
       const name = typeof source.name === 'object' ? source.name : { en: String(source.name || ''), ar: '' };
       reset({
         code: source.code || '',
         name: { en: (name as any)?.en || '', ar: (name as any)?.ar || '' },
         symbol: source.symbol || '',
-        exchange_rate: source.exchange_rate || 1,
+        exchange_rate: source.exchange_rate ?? 1,
         is_default: source.is_default ?? false,
         is_active: Boolean(source.is_active),
       });
     }
-  }, [detailsResponse?.data, fromState, isEditMode, reset]);
+  }, [source, reset]);
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
   const errorMessage = createMutation.error?.message || updateMutation.error?.message || null;
@@ -171,7 +173,13 @@ export default function CreatePage() {
                 <div className="flex items-center gap-3 rounded-2xl border border-border/50 bg-muted/20 p-4 transition-colors hover:border-emerald-500/30">
                   <Switch
                     checked={field.value}
-                    onChange={(e) => field.onChange((e.target as HTMLInputElement).checked)}
+                    disabled={isCurrentDefault}
+                    aria-label={t('form.defaultCurrencyLabel')}
+                    onChange={(e) => {
+                      const checked = (e.target as HTMLInputElement).checked;
+                      field.onChange(checked);
+                      if (checked) setValue('is_active', true, { shouldDirty: true, shouldValidate: true });
+                    }}
                   />
                   <Typography variant="subtitle2" className="font-semibold text-foreground">
                     {t('form.defaultCurrencyLabel')}
@@ -182,10 +190,14 @@ export default function CreatePage() {
             <Controller
               name="is_active"
               control={control}
-              render={({ field }) => (
+              render={({ field, fieldState }) => (
                 <div className="flex items-center gap-3 rounded-2xl border border-border/50 bg-muted/20 p-4 transition-colors hover:border-emerald-500/30">
                   <Switch
                     checked={field.value}
+                    disabled={isDefault && field.value}
+                    aria-label={t('active')}
+                    error={!!fieldState.error}
+                    helperText={fieldState.error?.message}
                     onChange={(e) => field.onChange((e.target as HTMLInputElement).checked)}
                   />
                   <Typography variant="subtitle2" className="font-semibold text-foreground">
@@ -195,6 +207,9 @@ export default function CreatePage() {
               )}
             />
           </Box>
+          <Typography variant="body2" className="px-6 pb-6 text-muted-foreground">
+            {t('form.currencyDefaultHelp')}
+          </Typography>
         </Box>
       </CreateFormLayout>
     </>

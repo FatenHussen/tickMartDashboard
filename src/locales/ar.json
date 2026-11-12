@@ -2128,10 +2128,11 @@
       "addDetail": "أضف التفاصيل",
       "selectCategoryFirstDetails": "حدد فئة أولاً لتحميل تفاصيل منتج.",
       "noCategoryDetailsForCategory": "لا توجد تفاصيل خاصة بالفئة لهذه الفئة.",
+      "selectCategoryDetail": "اختر تفصيلاً",
       "selectCategoryDetailValue": "اختر قيمة",
       "categoryDetailPredefinedValueLabel": "قيمة معرّفة مسبقاً",
       "noPredefinedDetailValues": "لا توجد خيارات جاهزة لهذا الحقل بعد. أضفها من «تفاصيل منتج» في لوحة الإدارة ثم اختر قيمة هنا.",
-      "categoryDetailValueNotInList": "القيمة المحفوظة (إنكليزي: «{{en}}»، عربي: «{{ar}}») ليست في القائمة الحالية. اختر أحد الخيارات المعرّفة.",
+      "categoryDetailValueNotInList": "القيمة المحفوظة («{{value}}») ليست في القائمة الحالية. اختر أحد الخيارات المعرّفة.",
       "categoryDetailValueOptionsTitle": "قيم جاهزة",
       "categoryDetailValueOptionsDesc": "كل خيار يحتوي نصاً بالعربية والإنجليزية. المنتجات التي تستخدم هذا الحقل ستختار من القائمة عند توفرها.",
       "categoryDetailValueOptionsEmptyAdmin": "لا توجد قيم جاهزة بعد. استخدم «إضافة خيار» لإنشاء خيارات ثنائية اللغة.",
@@ -3113,6 +3114,7 @@
       "currencyExchangeRateLabel": "سعر الصرف",
       "placeholderExchange1": "1",
       "defaultCurrencyLabel": "العملة الافتراضية",
+      "currencyDefaultHelp": "اختر عملة نشطة أخرى كعملة افتراضية قبل حذف العملة الافتراضية الحالية أو إيقافها.",
       "currencyCreateDocumentTitle": "{{appName}} — إنشاء عملة",
       "currencyEditDocumentTitle": "{{appName}} — تحرير العملة",
       "createCurrencySubmit": "إنشاء العملة",
@@ -4652,7 +4654,12 @@
       "itemLineTotalLabel": "إجمالي ",
       "itemDeliveryWindow": "وقت التوصيل",
       "itemCustomerNote": "ملاحظة العميل",
-      "itemSpecifications": "الخيارات المحددة"
+      "itemSpecifications": "المتغيرات المطلوبة",
+      "itemShop": "المتجر",
+      "itemProductNumber": "رقم المنتج",
+      "itemSku": "SKU",
+      "itemModelNumber": "رقم الموديل",
+      "itemAvailableQty": "العدد المتوفر"
     },
     "tableNames": {
       "activityLog": "سجل النشاط",
@@ -5201,11 +5208,12 @@
       "generalScopeExclusive": "لا يمكن دمج \"عام\" مع نطاقات أخرى"
     },
     "currency": {
-      "codeLength": "يجب أن يتكون الرمز من 3 أحرف بالضبط",
+      "codeLength": "يجب أن يتكون رمز العملة من 3 أحرف إنجليزية بالضبط",
       "nameEnRequired": "الاسم الانجليزي مطلوب",
       "nameArRequired": "الاسم العربي مطلوب",
       "symbolRequired": "الرمز مطلوب",
-      "exchangeRateMin": "يجب أن يكون سعر الصرف أكبر من 0"
+      "exchangeRateMin": "يجب أن يكون سعر الصرف عددًا محدودًا أكبر من 0",
+      "defaultMustBeActive": "يجب أن تكون العملة الافتراضية نشطة"
     },
     "driver": {
       "nameRequired": "الاسم مطلوب",

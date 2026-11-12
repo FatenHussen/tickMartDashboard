@@ -1,5 +1,6 @@
 import type { TFunction } from 'i18next';
 
+import { Link } from 'react-router';
 import { Iconify } from '@/shared/components/iconify';
 import {
   formatDecimal,
@@ -12,6 +13,8 @@ import {
   type OrderDetailItem,
   ORDER_ITEM_STATUS_OPTIONS,
 } from '@/pages/dashboard/orders/types/order.types';
+
+import { paths } from 'src/routes/paths';
 
 import { toDisplayString } from 'src/utils/to-display-string';
 
@@ -46,6 +49,45 @@ function hasDistinctFinalUnit(item: OrderDetailItem): boolean {
   return Number(u) !== Number(f);
 }
 
+function firstText(...values: Array<unknown>): string | null {
+  for (const value of values) {
+    if (value == null) continue;
+    const text = toDisplayString(value).trim();
+    if (text && text !== '—') return text;
+  }
+  return null;
+}
+
+function firstNumber(...values: Array<number | null | undefined>): number | null {
+  for (const value of values) {
+    if (value == null) continue;
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+/** Store selling the line — the API may nest it or flatten it onto the item. */
+function itemShopName(item: OrderDetailItem): string | null {
+  return firstText(item.shop?.name, item.shop_name, item.store_name, item.vendor_name);
+}
+
+function itemProductId(item: OrderDetailItem): number | null {
+  return firstNumber(item.product_id);
+}
+
+function itemSku(item: OrderDetailItem): string | null {
+  return firstText(item.variant_sku, item.sku, item.product_sku);
+}
+
+function itemModelNumber(item: OrderDetailItem): string | null {
+  return firstText(item.variant_model_number, item.model_number, item.product_model_number);
+}
+
+function itemAvailableQuantity(item: OrderDetailItem): number | null {
+  return firstNumber(item.available_quantity, item.variant_quantity, item.stock, item.product_quantity);
+}
+
 export type OrderLineItemCardProps = {
   item: OrderDetailItem;
   index: number;
@@ -58,6 +100,14 @@ export type OrderLineItemCardProps = {
 
 const selectClassName =
   'mt-1 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-50';
+
+function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <p className="text-sm text-muted-foreground">
+      {label}: <span className="text-foreground">{children}</span>
+    </p>
+  );
+}
 
 export function OrderLineItemCard({
   item,
@@ -77,6 +127,12 @@ export function OrderLineItemCard({
       ? ORDER_ITEM_STATUS_OPTIONS
       : [parsedItemStatus, ...ORDER_ITEM_STATUS_OPTIONS.filter((s) => s !== parsedItemStatus)]
     : ORDER_ITEM_STATUS_OPTIONS;
+
+  const shopName = itemShopName(item);
+  const productId = itemProductId(item);
+  const sku = itemSku(item);
+  const modelNumber = itemModelNumber(item);
+  const availableQuantity = itemAvailableQuantity(item);
 
   const optionLabels = Array.isArray(item.variant_attributes)
     ? item.variant_attributes.map((attr) => {
@@ -105,6 +161,46 @@ export function OrderLineItemCard({
           <span className="me-2 tabular-nums text-muted-foreground">{index + 1}.</span>
           {item.product_name}
         </p>
+
+        <div className="mt-1.5 space-y-0.5">
+          {shopName ? <MetaRow label={t('orders.itemShop')}>{shopName}</MetaRow> : null}
+
+          {productId != null ? (
+            <MetaRow label={t('orders.itemProductNumber')}>
+              <Link
+                to={paths.dashboard.product.details(productId)}
+                className="font-medium text-primary underline-offset-2 hover:underline"
+              >
+                #{productId}
+              </Link>
+            </MetaRow>
+          ) : null}
+
+          {sku ? (
+            <MetaRow label={t('orders.itemSku')}>
+              <span className="font-mono text-xs">{sku}</span>
+            </MetaRow>
+          ) : null}
+
+          {optionLabels.length > 0 ? (
+            <MetaRow label={t('orders.itemSpecifications')}>{optionLabels.join(', ')}</MetaRow>
+          ) : null}
+
+          {modelNumber ? (
+            <MetaRow label={t('orders.itemModelNumber')}>{modelNumber}</MetaRow>
+          ) : null}
+
+          {availableQuantity != null ? (
+            <MetaRow label={t('orders.itemAvailableQty')}>
+              <span
+                className={`tabular-nums ${availableQuantity <= 0 ? 'font-semibold text-destructive' : ''}`}
+              >
+                {availableQuantity}
+              </span>
+            </MetaRow>
+          ) : null}
+        </div>
+
         <p className="mt-1 text-sm text-muted-foreground">
           {t('orders.itemQtyLabel')}:{' '}
           <span className="tabular-nums text-foreground">{item.quantity}</span>
@@ -125,9 +221,6 @@ export function OrderLineItemCard({
           <p className="mt-1 text-sm text-muted-foreground">
             {t('orders.itemDiscountLabel')}: −{discount}
           </p>
-        ) : null}
-        {optionLabels.length > 0 ? (
-          <p className="mt-1 text-sm text-foreground">{optionLabels.join(', ')}</p>
         ) : null}
         {item.extras && item.extras.length > 0 ? (
           <p className="mt-1 text-sm text-muted-foreground">
